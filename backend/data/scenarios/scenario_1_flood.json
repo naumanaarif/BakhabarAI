@@ -1,0 +1,17 @@
+{
+  "scenario_id": "flood_001",
+  "name": "Urban Flood in G-10",
+  "description": "Heavy monsoon rain leading to urban flooding in G-10 sector.",
+  "initial_signals": [
+    {
+      "signal_id": "weather_flood_001",
+      "source_type": "weather",
+      "source_name": "Google Weather API",
+      "timestamp": "2024-01-15T14:00:00Z",
+      "location": { "name": "Islamabad", "lat": 33.6844, "lng": 73.0479 },
+      "content": "Alert: Extreme rainfall expected in next 2 hours (50mm+).",
+      "credibility_score": 1.0,
+      "is_mock": false
+    }
+  ]
+}

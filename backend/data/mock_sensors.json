@@ -1,0 +1,12 @@
+[
+  {
+    "signal_id": "sn_001",
+    "source_type": "sensor",
+    "source_name": "Drainage Sensor DS-10",
+    "timestamp": "2024-01-15T14:25:00Z",
+    "location": { "name": "G-10 Main Nullah", "lat": 33.6820, "lng": 73.0450 },
+    "content": "Water level: 2.5m (Critical threshold 2.0m)",
+    "credibility_score": 1.0,
+    "is_mock": true
+  }
+]

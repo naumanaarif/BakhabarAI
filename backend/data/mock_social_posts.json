@@ -1,0 +1,22 @@
+[
+  {
+    "signal_id": "sp_001",
+    "source_type": "social",
+    "source_name": "WhatsApp Report",
+    "timestamp": "2024-01-15T14:30:00Z",
+    "location": { "name": "G-10, Islamabad", "lat": 33.6844, "lng": 73.0479 },
+    "content": "G-10 mein pani bhar gaya hai, gaariyan phans gayi hain",
+    "credibility_score": 0.7,
+    "is_mock": true
+  },
+  {
+    "signal_id": "sp_002",
+    "source_type": "social",
+    "source_name": "X (Twitter)",
+    "timestamp": "2024-01-15T14:35:00Z",
+    "location": { "name": "F-10 Markaz, Islamabad", "lat": 33.6934, "lng": 73.0119 },
+    "content": "Heavy traffic jam near F-10 due to water logging on roads.",
+    "credibility_score": 0.65,
+    "is_mock": true
+  }
+]

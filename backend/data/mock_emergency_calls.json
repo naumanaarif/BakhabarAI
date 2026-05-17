@@ -1,0 +1,12 @@
+[
+  {
+    "signal_id": "ec_001",
+    "source_type": "emergency_call",
+    "source_name": "1122 Dispatch",
+    "timestamp": "2024-01-15T14:40:00Z",
+    "location": { "name": "G-10/4, Islamabad", "lat": 33.6800, "lng": 73.0400 },
+    "content": "Caller reports basement flooding in residential house.",
+    "credibility_score": 0.9,
+    "is_mock": true
+  }
+]

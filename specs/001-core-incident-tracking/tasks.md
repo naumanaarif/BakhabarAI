@@ -55,14 +55,14 @@
 
 ### Implementation for User Story 1
 
-- [ ] T018 [P] [US1] Implement `backend/routers/mock_data_router.py` to serve mock incidents via API
-- [ ] T019 [US1] Add GET endpoint `/api/incidents` in `backend/main.py` using `mock_data_router`
-- [ ] T020 [P] [US1] Create `Location Access` popup flow for splash/home screen in `mobile/lib/screens/splash_screen.dart`
-- [ ] T021 [US1] Implement `mobile/lib/screens/home_screen.dart` to fetch and display incidents list
-- [ ] T022 [US1] Implement `CrisisMarker` widget in `mobile/lib/widgets/crisis_marker.dart` (RED, ORANGE, PURPLE)
-- [ ] T023 [US1] Implement `mobile/lib/screens/map_screen.dart` to display Google Map with `CrisisMarker`s
-- [ ] T024 [US1] Add state management logic in `mobile/lib/screens/home_screen.dart` to use `SkeletonLoader` while fetching data
-- [ ] T025 [US1] Link `home_screen.dart` and `map_screen.dart` into `BottomNavBar` navigation
+- [x] T018 [P] [US1] Implement `backend/routers/mock_data_router.py` to serve mock incidents via API
+- [x] T019 [US1] Add GET endpoint `/api/incidents` in `backend/main.py` using `mock_data_router`
+- [x] T020 [P] [US1] Create `Location Access` popup flow for splash/home screen in `mobile/lib/screens/splash_screen.dart`
+- [x] T021 [US1] Implement `mobile/lib/screens/home_screen.dart` to fetch and display incidents list
+- [x] T022 [US1] Implement `CrisisMarker` widget in `mobile/lib/widgets/crisis_marker.dart` (RED, ORANGE, PURPLE)
+- [x] T023 [US1] Implement `mobile/lib/screens/map_screen.dart` to display Google Map with `CrisisMarker`s
+- [x] T024 [US1] Add state management logic in `mobile/lib/screens/home_screen.dart` to use `SkeletonLoader` while fetching data
+- [x] T025 [US1] Link `home_screen.dart` and `map_screen.dart` into `BottomNavBar` navigation
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -76,13 +76,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T026 [P] [US2] Implement POST endpoint `/api/report` in `backend/main.py`
-- [ ] T027 [US2] Create basic Agent interaction logic in `backend/agents/reporter.py` for handling reports
-- [ ] T028 [US2] Implement `mobile/lib/screens/auth/otp_screen.dart` to simulate OTP requirement for reporting
-- [ ] T029 [US2] Implement AI Assistant Chat UI in `mobile/lib/screens/report_screen.dart` (or `ai_assistant_chat_screen.dart` if combined)
-- [ ] T030 [US2] Implement Agent Processing indicator (loading circle with agent name) in the Chat UI
-- [ ] T031 [US2] Connect report submission to `api_service.dart` and handle response
-- [ ] T032 [US2] Handle UI transition and success state after report is submitted
+- [x] T026 [P] [US2] Implement POST endpoint `/api/report` in `backend/main.py`
+- [x] T027 [US2] Create basic Agent interaction logic in `backend/agents/reporter.py` for handling reports
+- [x] T028 [US2] Implement `mobile/lib/screens/auth/otp_screen.dart` to simulate OTP requirement for reporting
+- [x] T029 [US2] Implement AI Assistant Chat UI in `mobile/lib/screens/report_screen.dart` (or `ai_assistant_chat_screen.dart` if combined)
+- [x] T030 [US2] Implement Agent Processing indicator (loading circle with agent name) in the Chat UI
+- [x] T031 [US2] Connect report submission to `api_service.dart` and handle response
+- [x] T032 [US2] Handle UI transition and success state after report is submitted
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -96,14 +96,14 @@
 
 ### Implementation for User Story 3
 
-- [ ] T033 [P] [US3] Add GET endpoint `/api/incidents/{id}` in `backend/main.py`
-- [ ] T034 [P] [US3] Implement GET endpoint `/api/logs` in `backend/main.py` to fetch AgentTrace data
-- [ ] T035 [US3] Create `AgentTrace` model in `mobile/lib/models/agent_log.dart`
-- [ ] T036 [US3] Implement `mobile/lib/screens/incident_detail_screen.dart`
-- [ ] T037 [US3] Implement the "Expert View" toggle inside `incident_detail_screen.dart`
-- [ ] T038 [US3] Create UI for raw confidence scores and agent traces when "Expert View" is ON
-- [ ] T039 [US3] Ensure simplified terminology ("AI Verified") is shown when "Expert View" is OFF
-- [ ] T040 [US3] Implement `mobile/lib/screens/agent_logs_screen.dart` for the 4th tab in `BottomNavBar`
+- [x] T033 [P] [US3] Add GET endpoint `/api/incidents/{id}` in `backend/main.py`
+- [x] T034 [P] [US3] Implement GET endpoint `/api/logs` in `backend/main.py` to fetch AgentTrace data
+- [x] T035 [US3] Create `AgentTrace` model in `mobile/lib/models/agent_log.dart`
+- [x] T036 [US3] Implement `mobile/lib/screens/incident_detail_screen.dart`
+- [x] T037 [US3] Implement the "Expert View" toggle inside `incident_detail_screen.dart`
+- [x] T038 [US3] Create UI for raw confidence scores and agent traces when "Expert View" is ON
+- [x] T039 [US3] Ensure simplified terminology ("AI Verified") is shown when "Expert View" is OFF
+- [x] T040 [US3] Implement `mobile/lib/screens/agent_logs_screen.dart` for the 4th tab in `BottomNavBar`
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -113,11 +113,11 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T041 [P] Ensure smooth screen transitions are applied across all routes in `router.dart`
-- [ ] T042 Verify all UI mock data is completely removed and fetched via backend APIs
-- [ ] T043 Refine "Glassmorphism" aesthetic and premium look across all cards and widgets
-- [ ] T044 Run end-to-end user journeys for the 3 demo scenarios
-- [ ] T045 Final cleanup of `README.md` and export of agent traces to `traces/` folder
+- [x] T041 [P] Ensure smooth screen transitions are applied across all routes in `router.dart`
+- [x] T042 Verify all UI mock data is completely removed and fetched via backend APIs
+- [x] T043 Refine "Glassmorphism" aesthetic and premium look across all cards and widgets
+- [x] T044 Run end-to-end user journeys for the 3 demo scenarios
+- [x] T045 Final cleanup of `README.md` and export of agent traces to `traces/` folder
 
 ---
 
