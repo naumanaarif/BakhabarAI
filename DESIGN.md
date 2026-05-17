@@ -172,10 +172,22 @@ The design system employs a "Soft-Tech" shape language.
 - **Information Cards:** White background, 16px padding, soft shadow.
 - **Map Overlays:** Semi-transparent glass (85% white), 12px blur, 16px radius. Used for floating map controls and quick-stats.
 
-### Navigation
-- **Bottom Nav:** A white pill-shaped bar floating 20px from the bottom. 
+### Navigation & Transitions
+- **Navigation Bar:** Present on each screen. Bottom Nav is a white pill-shaped bar floating 20px from the bottom. 
+- **Buttons:** HOME, MAP, AI ASSISTANT CHAT, Agent Logs (old runs).
 - **Active State:** The active icon and label transition to Coral (`#ff6036`) with a subtle background "blob" indicator.
+- **Top App Bar:** Each screen must have a Back Button on the top left corner.
+- **Transitions:** Smooth transitions must be applied when switching between screens.
 
-### Chips & Badges
-- **Status Badges:** 8px radius, low-saturation background with high-saturation text of the same hue (e.g., light red bg with dark red text for "Critical").
-- **Interactive Chips:** Pill-shaped, 32px height, used for filtering incident types.
+### Loading States & Agent Interactions
+- **Skeleton Loading:** Use skeleton loading placeholders across the whole app while fetching data or initializing. Avoid basic spinners for general data loading.
+- **Agent Processing:** When an Agent is processing a response, the app must show a loading circle accompanied by the specific Agent's name.
+
+### Map Elements
+- **Incident Markers:** Incidents on the Map screen must be color-coded by category:
+  - **RED**: High severity / Critical
+  - **ORANGE**: Medium severity / Warnings
+  - **PURPLE**: Specific categories (e.g., AI Assessed / Unknown)
+
+### Clean Premium Look
+- Always prioritize a clean, premium visual aesthetic. Maintain high contrast, elegant typography, generous whitespace, and a high-end "Soft-Tech" glassmorphic feel. No hardcoded mock data on UI—everything must be functional, fetching from the FastAPI backend.

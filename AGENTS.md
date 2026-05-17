@@ -272,9 +272,8 @@ Stack Navigator:
 Bottom Tab Navigator (MainShell):
   ├── Tab 0: HomeScreen
   ├── Tab 1: MapScreen
-  ├── Tab 2: IncidentsScreen
-  ├── Tab 3: ReportScreen
-  └── Tab 4: AgentLogsScreen
+  ├── Tab 2: AIAssistantChatScreen
+  └── Tab 3: AgentLogsScreen
 
 Push Navigation (from screens above):
   IncidentsScreen → IncidentDetailScreen
@@ -289,11 +288,10 @@ Push Navigation (from screens above):
 ### Screen Purpose Summary
 ```
 SplashScreen          → App logo + loading
-SignupScreen          → Phone number + Send OTP
-OtpScreen             → 4-digit OTP verify
-HomeScreen            → Mini map + 3 incident previews + FAB
-MapScreen             → Full map + crisis markers + reroute overlay
-IncidentsScreen       → All incidents list + overall action buttons
+HomeScreen            → Mini map + incident previews + Location Access Popup
+MapScreen             → Full map + RED/ORANGE/PURPLE markers + reroute overlay
+AIAssistantChatScreen → AI Assistant chat for incidents/reporting
+AgentLogsScreen       → Scrollable agent reasoning timeline
 IncidentDetailScreen  → Single crisis full info + media + sources
 ResourceAllocation    → Pool + assignments + trade-offs (overall OR specific)
 SimulationScreen      → Before/Actions/After tabs (overall OR specific)
@@ -504,18 +502,21 @@ scenario_3_false_alarm.json
 ❌ Never make API calls directly from screens — use services/api_service.dart
 ❌ Never use setState for complex state — use Provider/Riverpod
 ❌ Never use localStorage/browser storage
-❌ Never skip loading states — every API call needs a loading indicator
+❌ Never skip loading states — every API call needs a Skeleton Loading placeholder
 ❌ Never skip error states — every API call needs an error handler
+❌ Never hardcode mock data on the UI. Create an API endpoint to fetch mockup data.
 ```
 
 ### Always Do These
 ```
 ✅ Always use AppColors.accent for coral color references
 ✅ Always use AppTextStyles for typography
-✅ Always show loading skeleton while fetching data
+✅ Always show Skeleton Loading placeholders while fetching data
 ✅ Always handle empty states (no incidents found etc)
-✅ Always use named routes for navigation
-✅ Always use const constructors where possible
+✅ Always use named routes for navigation with screen transitions
+✅ Always show a Back Button on the top left corner of each screen
+✅ Always show a loading circle with the agent name when Agent is processing a response
+✅ Always ask user for Location via popup on the main home/overview splash screen
 ✅ Always extract repeated UI into widgets/
 ```
 
