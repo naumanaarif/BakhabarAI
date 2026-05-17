@@ -1,6 +1,7 @@
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.maps_tool import reverse_geocode
+from .model_config import get_model
 import json
 
 async def analyze_signals(signals_json: str) -> str:
@@ -14,6 +15,7 @@ async def analyze_signals(signals_json: str) -> str:
 
 detector_agent = Agent(
     name="DetectorAgent",
+    model=get_model(),
     description="Classifies crisis type, location, severity, and confidence based on collected signals.",
     tools=[
         FunctionTool(reverse_geocode)

@@ -69,14 +69,51 @@ async def run_scenario(scenario: dict = None):
     # Clear previous traces for a fresh run
     tracer.clear()
     
-    # Run the agent pipeline
-    result = await run_crisis_simulation(scenario)
+    use_mock = scenario.get("mock", False) if scenario else False
     
-    return {
-        "status": "success",
-        "result": result,
-        "traces": tracer.get_traces()
-    }
+    if use_mock:
+        tracer.log("System", "mock_simulation_started", {"scenario": scenario}, {})
+        import asyncio
+        await asyncio.sleep(1)
+        tracer.log("SignalCollector", "signals_collected", {}, {"signals": ["weather_alert", "social_media_post"]})
+        await asyncio.sleep(1)
+        tracer.log("DetectorAgent", "crisis_detected", {"signals": 2}, {"type": "flood", "severity": "HIGH", "location": "G-10"})
+        return {
+            "status": "success",
+            "result": "Mock simulation completed successfully.",
+            "traces": tracer.get_traces()
+        }
+    
+    try:
+        # Run the agent pipeline
+        result = await run_crisis_simulation(scenario)
+        
+        return {
+            "status": "success",
+            "result": result,
+            "traces": tracer.get_traces()
+        }
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        stack_trace = traceback.format_exc()
+        
+        # Log error to tracer so it's visible in the app
+        tracer.log(
+            agent_name="System",
+            action="simulation_error",
+            input_data={"scenario": scenario},
+            output_data={"error": error_msg, "traceback": stack_trace},
+            confidence=0.0
+        )
+        
+        print(f"Error in run_scenario: {error_msg}\n{stack_trace}")
+        return {
+            "status": "error",
+            "message": error_msg,
+            "traceback": stack_trace,
+            "traces": tracer.get_traces()
+        }
 
 @router.get("/logs")
 async def get_logs():

@@ -1,10 +1,12 @@
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.maps_tool import get_distance_matrix
+from .model_config import get_model
 import json
 
 planner_agent = Agent(
     name="PlannerAgent",
+    model=get_model(),
     description="Allocates constrained resources across detected crises and explains trade-offs.",
     tools=[
         FunctionTool(get_distance_matrix)

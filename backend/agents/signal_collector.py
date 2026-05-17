@@ -3,6 +3,7 @@ from google.adk.tools import FunctionTool
 from tools.weather_tool import get_weather_data
 from tools.mock_tools import get_all_mock_signals
 from tracer import tracer
+from .model_config import get_model
 import json
 from datetime import datetime
 
@@ -35,7 +36,7 @@ async def collect_signals(location_name: str = "Islamabad") -> str:
     
     # Log the action
     tracer.log(
-        agent="SignalCollectorAgent",
+        agent_name="SignalCollectorAgent",
         action="collected_signals",
         input_data={"location": location_name},
         output_data={"signal_count": len(signals)},
@@ -46,6 +47,7 @@ async def collect_signals(location_name: str = "Islamabad") -> str:
 
 signal_collector_agent = Agent(
     name="SignalCollectorAgent",
+    model=get_model(),
     description="Ingests all signal sources and normalizes them for the crisis detection pipeline.",
     tools=[
         FunctionTool(collect_signals)

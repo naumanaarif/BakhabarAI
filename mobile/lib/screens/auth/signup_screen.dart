@@ -241,22 +241,29 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 
                 const SizedBox(height: 24),
-                // Footer
                 Center(
-                  child: RichText(
-                    text: TextSpan(
-                      style: AppTextStyles.bodyMuted,
-                      children: [
-                        const TextSpan(text: 'Already have account? '),
-                        TextSpan(
-                          text: 'Login',
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Already have account? ', style: AppTextStyles.bodyMuted),
+                      TextButton(
+                        onPressed: _isLoading ? null : _sendOtp,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Login',
                           style: TextStyle(
                             color: AppColors.accent,
                             fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
+                            fontSize: 14,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 48),

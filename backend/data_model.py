@@ -30,9 +30,10 @@ class Signal(BaseModel):
     is_mock: bool
 
 class AgentTrace(BaseModel):
-    timestamp: str
-    agent: str
+    id: str
+    agent_name: str
     action: str
-    input: dict
-    output: dict
+    input_data: dict
+    output_data: dict
     confidence: float
+    timestamp: str

@@ -1,8 +1,10 @@
 from google.adk.agents import Agent
+from .model_config import get_model
 import json
 
 reporter_agent = Agent(
     name="ReporterAgent",
+    model=get_model(),
     description="Generates final simulation outcome reports and stakeholder messages.",
     instruction="""
     You are the ReporterAgent. You receive all the data from previous agents.

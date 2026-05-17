@@ -187,6 +187,18 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _autoZoomToUserLocation() async {
+    final pos = await _locationService.getCurrentPosition();
+    if (pos != null && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(pos.latitude, pos.longitude),
+          12.5,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,6 +214,14 @@ class _MapScreenState extends State<MapScreen> {
             zoomControlsEnabled: false,
             onMapCreated: (controller) {
               _mapController = controller;
+              Geolocator.checkPermission().then((permission) {
+                if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+                  setState(() {
+                    _hasLocationPermission = true;
+                  });
+                  _autoZoomToUserLocation();
+                }
+              });
             },
             onTap: (_) {
               setState(() {

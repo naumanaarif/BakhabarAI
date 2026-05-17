@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
-import '../core/router.dart';
+import '../core/auth_provider.dart';
+import 'auth/signup_screen.dart';
 import '../models/incident.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -11,20 +13,21 @@ import '../widgets/skeleton_loader.dart';
 import 'incident_detail_screen.dart';
 import 'incidents_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ApiService _apiService = ApiService();
   final LocationService _locationService = LocationService();
   bool _isLoading = true;
   String? _error;
   List<Incident> _incidents = [];
   bool _hasLocationPermission = false;
+  bool _hasUnreadNotifications = true;
   GoogleMapController? _mapController;
 
   static const CameraPosition _initialCameraPosition = CameraPosition(
@@ -197,6 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
     return Scaffold(
       backgroundColor: AppColors.primary,
       appBar: AppBar(
@@ -206,23 +211,106 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade300, width: 1),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUKmia2wx8eVAvXT0lkvLLWAjIb20DQWVZINsTAYmYbObi-tD1dc0cTtLwf2elMnGAuQuc-ZMMX66aSTrhoYwO8diUfnlDxC-hc2-F3HQiSB8EPCsNTSpkUhBqlW4lxb9ylebE-5S9Ofs_DajW-sIjJVYD3XpfwxhQBq5U5hYwq5UOvJd0VYsFKvm382WYUfH3p9PkZUucNsnxf-3wzNtYPpQNQTX4EdDRavqEYy4YxPuW2p6mUTXEyGh7_ZZ9EG_sZNQ0Ue72SA',
+            GestureDetector(
+              onTap: () {
+                if (!authState.isAuthenticated) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => Container(
+                      height: MediaQuery.of(context).size.height * 0.85,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(32),
+                          topRight: Radius.circular(32),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(32),
+                          topRight: Radius.circular(32),
+                        ),
+                        child: Scaffold(
+                          backgroundColor: AppColors.primary,
+                          appBar: AppBar(
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            centerTitle: true,
+                            leading: IconButton(
+                              icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            title: const Text(
+                              'Sign Up / Log In',
+                              style: TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          body: SignupScreen(
+                            onAuthenticated: () {
+                              ref.read(authProvider.notifier).login('Ahmed');
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Successfully authenticated!'),
+                                  backgroundColor: AppColors.successGreen,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Log Out'),
+                      content: const Text('Are you sure you want to log out?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            ref.read(authProvider.notifier).logout();
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Log Out', style: TextStyle(color: AppColors.dangerRed)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: authState.isAuthenticated ? AppColors.accent : Colors.grey.shade300,
+                    width: 2,
                   ),
-                  fit: BoxFit.cover,
+                  image: const DecorationImage(
+                    image: NetworkImage(
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUKmia2wx8eVAvXT0lkvLLWAjIb20DQWVZINsTAYmYbObi-tD1dc0cTtLwf2elMnGAuQuc-ZMMX66aSTrhoYwO8diUfnlDxC-hc2-F3HQiSB8EPCsNTSpkUhBqlW4lxb9ylebE-5S9Ofs_DajW-sIjJVYD3XpfwxhQBq5U5hYwq5UOvJd0VYsFKvm382WYUfH3p9PkZUucNsnxf-3wzNtYPpQNQTX4EdDRavqEYy4YxPuW2p6mUTXEyGh7_ZZ9EG_sZNQ0Ue72SA',
+                    ),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 10),
             Text(
-              'Salam, Ahmed!',
+              authState.isAuthenticated ? 'Salam, ${authState.userName}!' : 'Salam!',
               style: AppTextStyles.h1.copyWith(
                 fontFamily: 'Plus Jakarta Sans',
                 fontSize: 20,
@@ -238,20 +326,21 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 IconButton(
                   icon: const Icon(LucideIcons.bell, color: AppColors.textPrimary, size: 24),
-                  onPressed: () {},
+                  onPressed: () => _showNotificationsSheet(context),
                 ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
+                if (_hasUnreadNotifications)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -552,6 +641,197 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  void _showNotificationsSheet(BuildContext context) {
+    setState(() {
+      _hasUnreadNotifications = false;
+    });
+
+    final List<Map<String, dynamic>> notifications = [
+      {
+        'title': 'Urban Flood Detected (G-10)',
+        'message': 'SignalCollector normalized WhatsApp report: heavy rain & water logging in G-10. Credibility: 0.95.',
+        'time': '5 mins ago',
+        'type': 'incident',
+        'icon': LucideIcons.waves,
+        'color': AppColors.severityHigh,
+      },
+      {
+        'title': 'Resource Allocation Dispatch',
+        'message': 'PlannerAgent automatically dispatched 3 Ambulances and 2 Rescue Squads to G-10 Flood area.',
+        'time': '8 mins ago',
+        'type': 'resource',
+        'icon': LucideIcons.hardHat,
+        'color': AppColors.severityMedium,
+      },
+      {
+        'title': 'Simulation Model Completed',
+        'message': 'ExecutorAgent executed simulation. High traffic reroutes triggered via Kashmir Highway.',
+        'time': '12 mins ago',
+        'type': 'sim',
+        'icon': LucideIcons.cpu,
+        'color': AppColors.accent,
+      },
+      {
+        'title': 'False Alarm Clearance (I-8)',
+        'message': 'ReporterAgent issued alert cancellation: Utility sensor checks confirm standard dry conditions in I-8.',
+        'time': '1 hour ago',
+        'type': 'incident',
+        'icon': LucideIcons.checkCircle,
+        'color': AppColors.severityLow,
+      },
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(32),
+            topRight: Radius.circular(32),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            const SizedBox(height: 12),
+            Container(
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Notifications',
+                    style: AppTextStyles.h1.copyWith(fontSize: 22),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: Colors.black12),
+            
+            // Notification List
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  final noti = notifications[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: Border(
+                        left: BorderSide(
+                          color: noti['color'] as Color,
+                          width: 4,
+                        ),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: (noti['color'] as Color).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            noti['icon'] as IconData,
+                            color: noti['color'] as Color,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      noti['title'] as String,
+                                      style: AppTextStyles.label.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    noti['time'] as String,
+                                    style: AppTextStyles.bodyMuted.copyWith(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                noti['message'] as String,
+                                style: AppTextStyles.bodyMuted.copyWith(
+                                  fontSize: 13,
+                                  color: AppColors.textMuted,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

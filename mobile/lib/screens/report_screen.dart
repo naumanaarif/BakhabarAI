@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
+import '../core/auth_provider.dart';
 import '../services/api_service.dart';
 import 'auth/signup_screen.dart';
 
-class ReportScreen extends StatefulWidget {
+class ReportScreen extends ConsumerStatefulWidget {
   const ReportScreen({Key? key}) : super(key: key);
 
   @override
-  State<ReportScreen> createState() => _ReportScreenState();
+  ConsumerState<ReportScreen> createState() => _ReportScreenState();
 }
 
-class _ReportScreenState extends State<ReportScreen> {
+class _ReportScreenState extends ConsumerState<ReportScreen> {
   final ApiService _apiService = ApiService();
-  bool _isAuthenticated = false;
   bool _isLoading = false;
 
   // Form Fields
@@ -84,7 +85,9 @@ class _ReportScreenState extends State<ReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isAuthenticated) {
+    final authState = ref.watch(authProvider);
+
+    if (!authState.isAuthenticated) {
       return Scaffold(
         backgroundColor: AppColors.primary,
         appBar: AppBar(
@@ -103,9 +106,7 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
         body: SignupScreen(
           onAuthenticated: () {
-            setState(() {
-              _isAuthenticated = true;
-            });
+            ref.read(authProvider.notifier).login('Ahmed');
           },
         ),
       );

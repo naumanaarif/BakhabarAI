@@ -1,10 +1,12 @@
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.maps_tool import get_directions
+from .model_config import get_model
 import json
 
 executor_agent = Agent(
     name="ExecutorAgent",
+    model=get_model(),
     description="Simulates response actions based on the resource plan.",
     tools=[
         FunctionTool(get_directions)

@@ -4,6 +4,7 @@ from agents.detector import detector_agent
 from agents.planner import planner_agent
 from agents.executor import executor_agent
 from agents.reporter import reporter_agent
+from .adk_runtime import run_agent_standalone
 
 # Main pipeline orchestration
 crisis_pipeline = SequentialAgent(
@@ -27,6 +28,6 @@ async def run_crisis_simulation(scenario_data: dict = None):
     if scenario_data:
         initial_input += f" Use this scenario data: {scenario_data}"
     
-    # Run the pipeline
-    result = await crisis_pipeline.run(initial_input)
+    # Run the pipeline using the standalone runner
+    result = await run_agent_standalone(crisis_pipeline, initial_input)
     return result

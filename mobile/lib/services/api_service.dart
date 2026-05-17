@@ -53,15 +53,24 @@ class ApiService {
   Future<List<AgentTrace>> getAgentLogs() async {
     try {
       final response = await _dio.get('/logs');
-      if (response.data != null && response.data is List) {
-        return (response.data as List)
-            .map((json) => AgentTrace.fromJson(json))
-            .toList();
+      if (response.data != null && response.data['traces'] != null) {
+        final List<dynamic> data = response.data['traces'];
+        return data.map((json) => AgentTrace.fromJson(json)).toList();
       }
       return [];
     } catch (e) {
       debugPrint('Error fetching agent logs: $e');
       throw Exception('Failed to load agent logs.');
+    }
+  }
+
+  Future<Map<String, dynamic>> runScenario(Map<String, dynamic> scenario) async {
+    try {
+      final response = await _dio.post('/run-scenario', data: scenario);
+      return response.data;
+    } catch (e) {
+      debugPrint('Error running scenario: $e');
+      throw Exception('Failed to run agent simulation.');
     }
   }
 }

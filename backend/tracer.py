@@ -6,16 +6,17 @@ class AgentTracer:
     def __init__(self):
         self.traces = []
 
-    def log(self, agent: str, action: str, 
+    def log(self, agent_name: str, action: str, 
             input_data: dict, output_data: dict, 
-            confidence: float = None):
+            confidence: float = 1.0):
         self.traces.append({
-            "timestamp": datetime.now().isoformat(),
-            "agent": agent,
+            "id": f"trace_{len(self.traces) + 1}",
+            "agent_name": agent_name,
             "action": action,
-            "input": input_data,
-            "output": output_data,
-            "confidence": confidence
+            "input_data": input_data,
+            "output_data": output_data,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat()
         })
 
     def export(self, path: str = "traces/agent_trace.json"):
