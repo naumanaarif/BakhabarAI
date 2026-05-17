@@ -1,4 +1,5 @@
 <!-- SPECKIT START -->
+> Current Implementation Plan: [specs/001-core-incident-tracking/plan.md](specs/001-core-incident-tracking/plan.md)
 
 # BakhabarAI — Agent Constitution & Spec Guide
 > Read this file FIRST before writing any code, creating any file, or making any decision.
