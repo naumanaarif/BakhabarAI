@@ -6,9 +6,8 @@ import '../models/agent_log.dart';
 class ApiService {
   late final Dio _dio;
   
-  // Use 10.0.2.2 for Android emulator to access localhost, or IP for physical device.
-  // We use a simple fallback mechanism.
-  static const String baseUrl = 'http://127.0.0.1:8000/api'; 
+  // Use 10.0.2.2 for Android emulator to access localhost, or machine IP for physical device.
+  static const String baseUrl = 'http://192.168.0.241:8000/api'; 
 
   ApiService() {
     _dio = Dio(BaseOptions(

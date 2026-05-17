@@ -36,12 +36,25 @@ class LocationService {
     if (!hasPermission) return null;
     
     try {
+      // 1. Instantly try last known position to bypass GPS locking delay
+      Position? position = await Geolocator.getLastKnownPosition();
+      if (position != null) return position;
+      
+      // 2. Fallback to quick low-accuracy request first to prevent timeouts
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 5),
+        desiredAccuracy: LocationAccuracy.low,
+        timeLimit: const Duration(seconds: 3),
       );
-    } catch (e) {
-      return null;
+    } catch (_) {
+      try {
+        // 3. Final fallback
+        return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.lowest,
+          timeLimit: const Duration(seconds: 2),
+        );
+      } catch (e) {
+        return null;
+      }
     }
   }
 }

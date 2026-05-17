@@ -3,7 +3,7 @@ import '../../core/theme.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
-  final VoidCallback onAuthenticated;
+  final Function(String name) onAuthenticated;
 
   const OtpScreen({
     Key? key,
@@ -23,10 +23,8 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void initState() {
     super.initState();
-    // Autopopulate code 4-5-6-7 as an easter egg for hackathon evaluators!
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controllers[0].text = '4';
-      _focusNodes[1].requestFocus();
+      _focusNodes[0].requestFocus();
     });
   }
 
@@ -59,8 +57,109 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() => _isLoading = false);
 
     if (mounted) {
-      widget.onAuthenticated();
+      _showNameInputDialog();
     }
+  }
+
+  void _showNameInputDialog() {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Welcome to BakhabarAI',
+            style: TextStyle(
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please enter your name to register:',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textMuted,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Ahmed Ali',
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: AppColors.primary.withOpacity(0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 8, right: 8),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter your name.'),
+                          backgroundColor: AppColors.dangerRed,
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop();
+                    widget.onAuthenticated(name);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

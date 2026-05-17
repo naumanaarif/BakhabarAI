@@ -252,12 +252,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                           body: SignupScreen(
-                            onAuthenticated: () {
-                              ref.read(authProvider.notifier).login('Ahmed');
+                            onAuthenticated: (name) {
+                              ref.read(authProvider.notifier).login(name);
                               Navigator.of(context).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Successfully authenticated!'),
+                                SnackBar(
+                                  content: Text('Successfully authenticated as $name!'),
                                   backgroundColor: AppColors.successGreen,
                                 ),
                               );

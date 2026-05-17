@@ -105,8 +105,8 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           elevation: 0,
         ),
         body: SignupScreen(
-          onAuthenticated: () {
-            ref.read(authProvider.notifier).login('Ahmed');
+          onAuthenticated: (name) {
+            ref.read(authProvider.notifier).login(name);
           },
         ),
       );

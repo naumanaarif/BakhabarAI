@@ -220,6 +220,13 @@ class _MapScreenState extends State<MapScreen> {
                     _hasLocationPermission = true;
                   });
                   _autoZoomToUserLocation();
+                } else if (_filteredIncidents.isNotEmpty) {
+                  _mapController!.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                      LatLng(_filteredIncidents[0].location.lat, _filteredIncidents[0].location.lng),
+                      12.5,
+                    ),
+                  );
                 }
               });
             },

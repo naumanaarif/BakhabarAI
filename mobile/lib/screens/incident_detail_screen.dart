@@ -495,9 +495,9 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(LucideIcons.cpu, size: 18),
-                        const SizedBox(width: 8),
-                        Text('Show Simulation', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
+                        const Icon(LucideIcons.cpu, size: 16),
+                        const SizedBox(width: 6),
+                        Text('Simulation', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -524,9 +524,9 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(LucideIcons.activity, size: 18),
-                        const SizedBox(width: 8),
-                        Text('Resource Allocation', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                        const Icon(LucideIcons.activity, size: 16),
+                        const SizedBox(width: 6),
+                        Text('Resources', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                       ],
                     ),
                   ),

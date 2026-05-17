@@ -3,7 +3,7 @@ import '../../core/theme.dart';
 import 'otp_screen.dart';
 
 class SignupScreen extends StatefulWidget {
-  final VoidCallback onAuthenticated;
+  final Function(String name) onAuthenticated;
 
   const SignupScreen({Key? key, required this.onAuthenticated}) : super(key: key);
 
@@ -57,10 +57,10 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             body: OtpScreen(
               phoneNumber: '+92 $phone',
-              onAuthenticated: () {
+              onAuthenticated: (name) {
                 // Pop the OTP screen and notify authentication succeeded
                 Navigator.of(context).pop();
-                widget.onAuthenticated();
+                widget.onAuthenticated(name);
               },
             ),
           ),
