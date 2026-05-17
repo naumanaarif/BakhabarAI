@@ -69,6 +69,10 @@ mobile/                          # Flutter app
 │   │   ├── incident_detail_screen.dart
 │   │   └── report_screen.dart
 │   ├── widgets/
+│   │   ├── skeleton_loader.dart
+│   │   ├── bottom_nav_bar.dart
+│   │   ├── top_app_bar.dart
+│   │   └── crisis_marker.dart
 │   ├── models/
 │   └── services/
 │       └── api_service.dart
@@ -80,6 +84,8 @@ backend/                         # FastAPI + ADK
 │   └── detector.py
 ├── tools/
 ├── data/
+├── routers/
+│   └── mock_data_router.py  # New: serve mock UI data via API
 └── config.py
 ```
 

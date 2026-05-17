@@ -59,6 +59,7 @@ As a citizen, I want to see detailed safety instructions for an incident, and as
 - What happens if the device loses internet connectivity while attempting to submit an incident report?
 - How does the system display overlapping map markers when multiple distinct incidents occur in the exact same location or very close proximity?
 - How is the UI handled if the backend returns a malformed or empty response for the incident list?
+- What if the user denies the location permission request on the splash/home screen?
 
 ## Requirements *(mandatory)*
 
@@ -72,6 +73,13 @@ As a citizen, I want to see detailed safety instructions for an incident, and as
 - **FR-006**: The Incident Details screen MUST include an "Expert View" toggle.
 - **FR-007**: When "Expert View" is OFF, the system MUST NOT display raw confidence scores or agent trace logs (use simplified terminology like "AI Verified").
 - **FR-008**: When "Expert View" is ON, the system MUST display the raw confidence scores, agent reasoning, and simulation data.
+- **FR-009**: The UI MUST use Skeleton Loading Placeholders across the app for fetching data.
+- **FR-010**: The UI MUST show a loading circle with the agent name when an agent is processing a response.
+- **FR-011**: The app MUST present a Location Access popup on the main home/overview splash screen.
+- **FR-012**: Map Incident Markers MUST be color-coded based on severity: RED (High), ORANGE (Medium), PURPLE (Assessed/Other).
+- **FR-013**: The main navigation MUST be a bottom bar containing exactly 4 tabs: HOME, MAP, AI ASSISTANT CHAT, and Agent Logs (old runs).
+- **FR-014**: Every screen MUST feature a Back Button on the top left corner.
+- **FR-015**: No mock data shall be hardcoded on the UI; all mock UI data MUST be fetched via backend API endpoints.
 
 ### Key Entities
 
