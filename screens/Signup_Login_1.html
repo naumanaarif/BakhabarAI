@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BakhabarAI - Signup/Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-container": "#591000",
+                      "error-container": "#ffdad6",
+                      "inverse-primary": "#c9c6bf",
+                      "on-surface-variant": "#474740",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-fixed-variant": "#474741",
+                      "tertiary": "#5d5f5f",
+                      "surface-variant": "#e5e2e1",
+                      "on-primary": "#ffffff",
+                      "secondary-container": "#fd5f35",
+                      "on-secondary": "#ffffff",
+                      "secondary-fixed-dim": "#ffb4a1",
+                      "background": "#fcf9f8",
+                      "secondary": "#b32a00",
+                      "primary-fixed": "#e5e2da",
+                      "on-tertiary-fixed": "#1a1c1c",
+                      "surface-container-highest": "#e5e2e1",
+                      "surface-container": "#f0eded",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed-variant": "#454747",
+                      "primary-container": "#f4f1e9",
+                      "surface-bright": "#fcf9f8",
+                      "surface-tint": "#5f5e58",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#891e00",
+                      "inverse-surface": "#313030",
+                      "on-background": "#1c1b1b",
+                      "surface-container-low": "#f6f3f2",
+                      "on-error": "#ffffff",
+                      "inverse-on-surface": "#f3f0ef",
+                      "tertiary-container": "#f1f1f1",
+                      "primary-fixed-dim": "#c9c6bf",
+                      "tertiary-fixed": "#e2e2e2",
+                      "surface-dim": "#dcd9d9",
+                      "on-surface": "#1c1b1b",
+                      "on-tertiary-container": "#6c6e6e",
+                      "on-secondary-fixed": "#3c0800",
+                      "on-primary-container": "#6f6d67",
+                      "on-primary-fixed": "#1c1c17",
+                      "error": "#ba1a1a",
+                      "surface": "#fcf9f8",
+                      "tertiary-fixed-dim": "#c6c6c7",
+                      "secondary-fixed": "#ffdbd2",
+                      "outline-variant": "#c9c7bd",
+                      "primary": "#5f5e58",
+                      "outline": "#78776f",
+                      "surface-container-high": "#eae7e7"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "2xl": "1rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xxl": "48px",
+                      "base": "4px",
+                      "gutter": "16px",
+                      "container-margin": "20px",
+                      "md": "16px",
+                      "xl": "32px",
+                      "lg": "24px",
+                      "sm": "12px",
+                      "xs": "8px"
+              },
+              "fontFamily": {
+                      "label-sm": ["Inter"],
+                      "headline-xl": ["Plus Jakarta Sans"],
+                      "headline-md": ["Plus Jakarta Sans"],
+                      "headline-lg-mobile": ["Plus Jakarta Sans"],
+                      "body-sm": ["Inter"],
+                      "label-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "headline-lg": ["Plus Jakarta Sans"]
+              },
+              "fontSize": {
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom utilities for strict design system adherence */
+        .h-52px { height: 52px; }
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-primary-container text-on-surface antialiased min-h-screen flex flex-col md:justify-center md:items-center">
+<!-- Mobile Top Illustration Area (Hidden on larger screens to switch to card layout) -->
+<div class="w-full h-[309px] md:h-[353px] md:hidden relative overflow-hidden bg-primary-container flex-shrink-0">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A minimalist, abstract silhouette of a modern city skyline at dawn, designed for an urban intelligence app. The aesthetic is clean-tech and modern, utilizing soft, warm light-mode tones. The background features subtle geometric shapes and a pale, off-white sky, while the skyline itself is rendered in smooth, low-contrast neutral greys. The mood is calm, trustworthy, and technologically advanced, suitable for a high-stakes emergency response platform's welcome screen." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBXHYJxjt5YY2Q1Ax1sSY_87Vd03qFJDodG9f1kf6KUfZ3kBEpFF63LmvLNjCZVfIYXX6riEzGMZOU_NCCQh2vd6TXJLgDEE4GxSyJLjMWgLrimXQnLxMFe-NJnr_LLHzLz8U-i47hSb66hJdy-QnTSTo2KuH3qTaT-y5pO_jaWTIsqrU6BQVZWn__JOOq-UtGLU_3xIzM46CIvpuw-x1el5Z_QMSqdLHV0YmTlfXiphRPr1RPyKoT6EMdlSb6pkKHaOTQ4AkSv780'); opacity: 0.15; mix-blend-mode: multiply;">
+</div>
+<!-- Decorative subtle elements -->
+<div class="absolute top-10 left-6 w-24 h-24 bg-surface rounded-full opacity-20 blur-2xl"></div>
+<div class="absolute top-20 right-10 w-32 h-32 bg-secondary-container rounded-full opacity-10 blur-3xl"></div>
+</div>
+<!-- Main Content Card -->
+<main class="flex-1 w-full bg-surface md:bg-transparent rounded-t-[32px] md:rounded-none -mt-8 md:mt-0 relative z-10 flex flex-col px-container-margin pt-xl pb-xxl md:p-0 md:max-w-md w-full">
+<!-- Desktop Container styling -->
+<div class="md:bg-surface md:p-xl md:rounded-2xl md:shadow-[0_8px_30px_rgba(0,0,0,0.04)] md:border md:border-outline-variant/20 w-full">
+<!-- Desktop header illustration (Hidden on mobile) -->
+<div class="hidden md:block w-full h-32 rounded-xl mb-lg overflow-hidden relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A minimalist, abstract silhouette of a modern city skyline at dawn, designed for an urban intelligence app. The aesthetic is clean-tech and modern, utilizing soft, warm light-mode tones. The background features subtle geometric shapes and a pale, off-white sky, while the skyline itself is rendered in smooth, low-contrast neutral greys. The mood is calm, trustworthy, and technologically advanced, suitable for a high-stakes emergency response platform's welcome screen." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBoBGrDsRMcS13Ke9IotZscbLLLWhHjukQr-hJodMFL1NgHmEht-daj7iLkSOxq7riURvQqWj2Vpa0DFk2NCZF4e1p_ClMweONrTLhlP4ROfLxQt1khLKZp6xlG6fErXwKYhLlJpymsSraNqgKjjNSWibHTKeMc-s7BXo5RUwSTyK6BJsmYyxpn7Wb4Xmjdd67djhhHmXH_KXVchDG5NvSph3uWJqS9sHtl87hzgAADUjBCwuKmloOCFB8OaDkbz_bemL-jRqRqFtI'); opacity: 0.2; mix-blend-mode: multiply;">
+</div>
+</div>
+<!-- Branding / Welcome Text -->
+<div class="mb-xl text-left">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-md md:text-headline-md text-on-surface mb-xs">
+                    Salam! Let's get started
+                </h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                    Enter your phone number to access the intelligence platform.
+                </p>
+</div>
+<!-- Form Area -->
+<form action="#" class="flex flex-col gap-lg w-full" method="POST">
+<!-- Phone Number Input Group -->
+<div class="flex flex-col gap-base w-full">
+<label class="sr-only font-label-sm text-label-sm text-on-surface-variant" for="phone-input">Phone Number</label>
+<div class="relative flex items-center w-full h-52px bg-surface border border-outline-variant rounded-xl overflow-hidden focus-within:border-secondary-container focus-within:ring-1 focus-within:ring-secondary-container transition-all shadow-sm">
+<!-- Country Code Prefix -->
+<div class="flex items-center h-full px-sm border-r border-outline-variant bg-surface-container-lowest text-on-surface">
+<span aria-hidden="true" class="mr-2 text-lg leading-none">🇵🇰</span>
+<span class="font-body-md text-body-md font-medium text-on-surface">+92</span>
+</div>
+<!-- Input Field -->
+<input autocomplete="tel-national" class="flex-1 h-full px-sm bg-transparent border-none outline-none font-body-md text-body-md text-on-surface placeholder:text-outline focus:ring-0" id="phone-input" name="phone" placeholder="300 1234567" required="" type="tel"/>
+</div>
+</div>
+<!-- CTA Button -->
+<button class="w-full h-52px bg-secondary-container text-on-secondary font-label-md text-label-md rounded-2xl flex items-center justify-center hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-md" type="submit">
+                    Send OTP
+                </button>
+</form>
+<!-- Footer Link -->
+<div class="mt-lg text-center w-full">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Already have account? 
+                    <a class="text-secondary font-medium hover:underline decoration-secondary/30 underline-offset-4 transition-all" href="#">
+                        Login
+                    </a>
+</p>
+</div>
+<!-- Trust Indicator / Safe Area Padding -->
+<div class="mt-xl flex justify-center items-center gap-xs text-outline opacity-60 pb-md md:pb-0">
+<span aria-hidden="true" class="material-symbols-outlined text-[16px]">lock</span>
+<span class="font-label-sm text-label-sm">Secure Intelligence Portal</span>
+</div>
+</div>
+</main>
+</body></html>

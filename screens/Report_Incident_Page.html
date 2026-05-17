@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Report Incident - BakhabarAI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary": "#ffffff",
+                    "inverse-surface": "#313030",
+                    "on-error-container": "#93000a",
+                    "primary-fixed": "#e5e2da",
+                    "tertiary": "#5d5f5f",
+                    "inverse-on-surface": "#f3f0ef",
+                    "outline-variant": "#c9c7bd",
+                    "surface-tint": "#5f5e58",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#f0eded",
+                    "on-surface": "#1c1b1b",
+                    "on-background": "#1c1b1b",
+                    "outline": "#78776f",
+                    "on-primary-fixed-variant": "#474741",
+                    "secondary-fixed-dim": "#ffb4a1",
+                    "on-secondary-fixed": "#3c0800",
+                    "secondary": "#b32a00",
+                    "secondary-container": "#fd5f35",
+                    "tertiary-container": "#f1f1f1",
+                    "primary-fixed-dim": "#c9c6bf",
+                    "inverse-primary": "#c9c6bf",
+                    "surface-container-low": "#f6f3f2",
+                    "on-secondary-container": "#591000",
+                    "secondary-fixed": "#ffdbd2",
+                    "surface-dim": "#dcd9d9",
+                    "primary-container": "#f4f1e9",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "primary": "#5f5e58",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed": "#1c1c17",
+                    "background": "#fcf9f8",
+                    "surface-container-highest": "#e5e2e1",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#eae7e7",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-tertiary-container": "#6c6e6e",
+                    "on-secondary-fixed-variant": "#891e00",
+                    "on-primary-container": "#6f6d67",
+                    "on-surface-variant": "#474740",
+                    "surface-bright": "#fcf9f8",
+                    "surface-variant": "#e5e2e1",
+                    "surface": "#fcf9f8",
+                    "error": "#ba1a1a",
+                    "surface-container-lowest": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px",
+                    "button": "16px"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "sm": "12px",
+                    "lg": "24px",
+                    "xl": "32px",
+                    "xxl": "48px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "container-margin": "20px",
+                    "xs": "8px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter", "sans-serif"],
+                    "body-md": ["Inter", "sans-serif"],
+                    "headline-md": ["Plus Jakarta Sans", "sans-serif"],
+                    "label-sm": ["Inter", "sans-serif"],
+                    "headline-lg-mobile": ["Plus Jakarta Sans", "sans-serif"],
+                    "headline-xl": ["Plus Jakarta Sans", "sans-serif"],
+                    "label-md": ["Inter", "sans-serif"],
+                    "body-sm": ["Inter", "sans-serif"],
+                    "headline-lg": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md selection:bg-secondary-container/20 selection:text-secondary-container">
+<!-- TopAppBar Shared Component -->
+<header class="bg-surface/85 dark:bg-surface-container/85 backdrop-blur-md full-width top-0 border-b border-outline-variant/30 flat no shadows fixed top-0 left-0 w-full z-50 flex items-center px-container-margin h-[64px] hover:opacity-80 transition-opacity">
+<button aria-label="Go back" class="text-secondary dark:text-secondary-fixed-dim hover:opacity-80 transition-opacity scale-95 transition-transform flex items-center justify-center mr-4">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface dark:text-on-background">BakhabarAI</h1>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-[1280px] mx-auto px-container-margin pt-[104px] pb-[120px] grid grid-cols-4 md:grid-cols-12 gap-gutter">
+<!-- Header Section -->
+<div class="col-span-4 md:col-span-8 md:col-start-3 mb-lg">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Report Incident</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-base">Help us build a safer community by reporting real-time incidents.</p>
+</div>
+<!-- Form Area -->
+<form class="col-span-4 md:col-span-8 md:col-start-3 flex flex-col gap-lg">
+<!-- Incident Type Dropdown -->
+<div class="flex flex-col gap-base relative group">
+<label class="font-label-md text-label-md text-on-surface">Incident Type</label>
+<div class="relative">
+<select class="appearance-none w-full bg-primary-container border border-outline-variant/40 rounded-lg h-[52px] px-md font-body-md text-body-md text-on-surface focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all cursor-pointer">
+<option disabled="" selected="" value="">Select category...</option>
+<option value="flood">Flood</option>
+<option value="heatwave">Heatwave</option>
+<option value="earthquake">Earthquake</option>
+<option value="fire">Urban Fire</option>
+<option value="accident">Traffic Accident</option>
+</select>
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant group-hover:text-on-surface transition-colors">expand_more</span>
+</div>
+</div>
+<!-- Description Text Field -->
+<div class="flex flex-col gap-base">
+<label class="font-label-md text-label-md text-on-surface">Description</label>
+<textarea class="w-full bg-primary-container border border-outline-variant/40 rounded-lg p-md font-body-md text-body-md text-on-surface focus:outline-none focus:border-secondary-container focus:ring-1 focus:ring-secondary-container transition-all min-h-[140px] resize-y placeholder:text-outline" placeholder="Provide details about the incident, visible damages, or required assistance..."></textarea>
+</div>
+<!-- Auto-detected Location Row -->
+<div class="flex flex-col gap-base">
+<label class="font-label-md text-label-md text-on-surface">Location</label>
+<div class="bg-primary-container border border-outline-variant/40 rounded-lg h-[52px] px-md flex items-center justify-between group focus-within:border-secondary-container focus-within:ring-1 focus-within:ring-secondary-container transition-all">
+<div class="flex items-center gap-sm overflow-hidden flex-1">
+<span class="material-symbols-outlined text-secondary-container" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<input class="bg-transparent border-none p-0 m-0 w-full font-body-md text-body-md text-on-surface focus:ring-0 truncate" readonly="" type="text" value="G-10, Islamabad"/>
+</div>
+<button aria-label="Edit Location" class="text-on-surface-variant hover:text-secondary-container transition-colors p-xs rounded-full hover:bg-surface-container-high ml-sm" type="button">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</div>
+</div>
+<!-- Media Upload Box -->
+<div class="flex flex-col gap-base">
+<label class="font-label-md text-label-md text-on-surface flex justify-between">
+<span>Media Evidence</span>
+<span class="font-body-sm text-body-sm text-outline font-normal">Optional</span>
+</label>
+<label class="bg-primary-container border-2 border-dashed border-outline-variant/60 rounded-lg p-xl flex flex-col items-center justify-center gap-sm cursor-pointer hover:border-secondary-container hover:bg-surface-container-low transition-all group">
+<input accept="image/*,video/*" class="hidden" multiple="" type="file"/>
+<div class="h-12 w-12 rounded-full bg-surface-container flex items-center justify-center group-hover:bg-secondary-fixed/50 transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-secondary-container transition-colors" style="font-variation-settings: 'FILL' 1;">photo_camera</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-center mt-xs group-hover:text-on-surface transition-colors">
+                        Tap to upload photos or videos<br/>
+<span class="text-outline text-[12px]">(Max 50MB)</span>
+</span>
+</label>
+</div>
+<!-- Amber Note (Signup Required) -->
+<div class="bg-secondary-fixed/30 border border-secondary-fixed-dim/50 rounded-lg p-md flex items-start gap-sm mt-sm shadow-sm">
+<span class="text-[16px] leading-tight select-none mt-[2px]">📝</span>
+<p class="font-body-sm text-body-sm text-on-secondary-fixed">Signup required to submit report. Your report will be saved as a draft locally until you log in.</p>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-secondary-container hover:bg-[#eb552e] text-on-secondary h-[52px] rounded-button font-label-md text-label-md flex items-center justify-center gap-sm transition-all shadow-[0_4px_12px_rgba(253,95,53,0.25)] hover:shadow-[0_6px_16px_rgba(253,95,53,0.35)] mt-md active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">send</span>
+                Submit Incident
+            </button>
+</form>
+</main>
+<!-- BottomNavBar Shared Component -->
+<!-- Shell Visibility & Relevance: Visible on destination screens. -->
+<nav class="md:hidden bg-surface dark:bg-surface-container rounded-full mx-container-margin mb-sm h-[72px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] fixed bottom-0 left-0 w-[calc(100%-40px)] z-50 flex justify-around items-center px-container-margin pb-sm">
+<!-- Home (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full p-2 transition-colors w-16" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</a>
+<!-- Map (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full p-2 transition-colors w-16" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">map</span>
+<span class="font-label-sm text-label-sm mt-1">Map</span>
+</a>
+<!-- Incidents (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full p-2 transition-colors w-16" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">warning</span>
+<span class="font-label-sm text-label-sm mt-1">Incidents</span>
+</a>
+<!-- Report (Active) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim relative after:content-[''] after:w-1 after:h-1 after:bg-secondary after:rounded-full after:mt-1 hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full p-2 scale-90 transition-all duration-200 w-16" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span class="font-label-sm text-label-sm mt-1 font-semibold">Report</span>
+</a>
+<!-- Logs (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full p-2 transition-colors w-16" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">history</span>
+<span class="font-label-sm text-label-sm mt-1">Logs</span>
+</a>
+</nav>
+</body></html>

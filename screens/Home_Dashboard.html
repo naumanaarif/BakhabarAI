@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>BakhabarAI - Home Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#313030",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e5e2da",
+                        "tertiary": "#5d5f5f",
+                        "inverse-on-surface": "#f3f0ef",
+                        "outline-variant": "#c9c7bd",
+                        "surface-tint": "#5f5e58",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#f0eded",
+                        "on-surface": "#1c1b1b",
+                        "on-background": "#1c1b1b",
+                        "outline": "#78776f",
+                        "on-primary-fixed-variant": "#474741",
+                        "secondary-fixed-dim": "#ffb4a1",
+                        "on-secondary-fixed": "#3c0800",
+                        "secondary": "#b32a00",
+                        "secondary-container": "#fd5f35",
+                        "tertiary-container": "#f1f1f1",
+                        "primary-fixed-dim": "#c9c6bf",
+                        "inverse-primary": "#c9c6bf",
+                        "surface-container-low": "#f6f3f2",
+                        "on-secondary-container": "#591000",
+                        "secondary-fixed": "#ffdbd2",
+                        "surface-dim": "#dcd9d9",
+                        "primary-container": "#f4f1e9",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "primary": "#5f5e58",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#1c1c17",
+                        "background": "#fcf9f8",
+                        "surface-container-highest": "#e5e2e1",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#eae7e7",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-tertiary-container": "#6c6e6e",
+                        "on-secondary-fixed-variant": "#891e00",
+                        "on-primary-container": "#6f6d67",
+                        "on-surface-variant": "#474740",
+                        "surface-bright": "#fcf9f8",
+                        "surface-variant": "#e5e2e1",
+                        "surface": "#fcf9f8",
+                        "error": "#ba1a1a",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "sm": "12px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "xxl": "48px",
+                        "md": "16px",
+                        "gutter": "16px",
+                        "container-margin": "20px",
+                        "xs": "8px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "headline-xl": ["Plus Jakarta Sans"],
+                        "label-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen font-sans antialiased pb-[120px]">
+<!-- Top Personalized Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-container-margin h-[72px] bg-surface/85 backdrop-blur-md">
+<div class="flex items-center gap-xs">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30 flex-shrink-0">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxUKmia2wx8eVAvXT0lkvLLWAjIb20DQWVZINsTAYmYbObi-tD1dc0cTtLwf2elMnGAuQuc-ZMMX66aSTrhoYwO8diUfnlDxC-hc2-F3HQiSB8EPCsNTSpkUhBqlW4lxb9ylebE-5S9Ofs_DajW-sIjJVYD3XpfwxhQBq5U5hYwq5UOvJd0VYsFKvm382WYUfH3p9PkZUucNsnxf-3wzNtYPpQNQTX4EdDRavqEYy4YxPuW2p6mUTXEyGh7_ZZ9EG_sZNQ0Ue72SA"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">Salam, Ahmed!</h1>
+</div>
+<button class="relative p-xs rounded-full hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-on-surface" style="font-variation-settings: 'FILL' 0;">notifications</span>
+<span class="absolute top-2 right-2 w-2.5 h-2.5 bg-secondary-container rounded-full border-2 border-surface"></span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[96px] px-container-margin flex flex-col gap-lg max-w-7xl mx-auto">
+<!-- Live Mini-Map Preview Card -->
+<section class="relative w-full h-[309px] min-h-[250px] bg-surface rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] overflow-hidden">
+<div aria-hidden="true" class="absolute inset-0 bg-surface-variant animate-pulse"></div>
+<img alt="Live Map Preview" class="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-multiply" data-alt="A minimalist, high-contrast digital map interface showing an urban grid. The map uses a sophisticated palette of soft grays and off-whites, creating a clean-tech aesthetic suitable for high-stakes intelligence. The lighting suggests a bright, daytime mode, emphasizing clarity and legibility of city blocks and arterial roads. The mood is clinical, modern, and highly functional." data-location="Lahore" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8scVm3rt6YjPiI6KuqYmS_IRusHGupPrAGKjKnVR0me5k9VkUSrOSFeKNtpqK5FZggwYdXXRGyqP25HTXy8vs5esJ6ucKUHdFS_1xl3OtxuDp0rEcpbJeE8QmIs3cJ8rLLdsT5foWnI7xMvmAESwTFDsT62HhgtvX3Nb_ejtnsQARD16aWKuZWssSNej43FOufao_P_0W6eLKOBXuGXQI53grdeaYhA4pXbxufACwn4qBzH1Ydkz-35xVoRcAPlaHTQKGU9OMJwQ"/>
+<!-- Map Markers -->
+<div class="absolute top-1/4 left-1/3">
+<div class="relative flex items-center justify-center">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+<span class="relative inline-flex rounded-full h-4 w-4 bg-error border-2 border-white shadow-sm"></span>
+</div>
+</div>
+<div class="absolute bottom-1/3 right-1/4">
+<div class="relative flex items-center justify-center">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary-container opacity-40"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-secondary-container border border-white shadow-sm"></span>
+</div>
+</div>
+<!-- Glassmorphic Overlay Stats -->
+<div class="absolute bottom-md left-md right-md bg-white/85 backdrop-blur-[12px] border border-white/20 rounded-[12px] p-sm shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">my_location</span>
+<span class="font-label-md text-label-md text-on-surface">Monitoring Zone Alpha</span>
+</div>
+<div class="flex items-center gap-base">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">2 Active</span>
+</div>
+</div>
+</section>
+<!-- Active Incidents Section -->
+<section class="flex flex-col gap-md">
+<div class="flex items-end justify-between px-xs">
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">Active Incidents</h2>
+<a class="font-label-md text-label-md text-secondary hover:opacity-80 transition-opacity" href="#">View All</a>
+</div>
+<div class="flex flex-col gap-sm">
+<!-- Incident Card 1 (HIGH) -->
+<div class="bg-surface p-md rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden border-l-4 border-error flex flex-col gap-sm">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-base">
+<h3 class="font-label-md text-label-md text-on-surface">Unauthorized Crowd Gathering</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 10 mins ago • Mall Road
+                            </p>
+</div>
+<div class="bg-error-container text-on-error-container px-xs py-base rounded-lg font-label-sm text-label-sm uppercase tracking-wider">
+                            High
+                        </div>
+</div>
+<div class="flex items-center justify-between mt-xs pt-sm border-t border-surface-variant">
+<span class="font-body-sm text-body-sm text-on-surface-variant">AI Confidence Rating</span>
+<span class="font-label-md text-label-md text-on-surface">94%</span>
+</div>
+</div>
+<!-- Incident Card 2 (MED) -->
+<div class="bg-surface p-md rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden border-l-4 border-secondary-container flex flex-col gap-sm">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-base">
+<h3 class="font-label-md text-label-md text-on-surface">Suspicious Vehicle Loitering</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 25 mins ago • Sector G-11
+                            </p>
+</div>
+<div class="bg-secondary-fixed text-on-secondary-fixed-variant px-xs py-base rounded-lg font-label-sm text-label-sm uppercase tracking-wider">
+                            Med
+                        </div>
+</div>
+<div class="flex items-center justify-between mt-xs pt-sm border-t border-surface-variant">
+<span class="font-body-sm text-body-sm text-on-surface-variant">AI Confidence Rating</span>
+<span class="font-label-md text-label-md text-on-surface">78%</span>
+</div>
+</div>
+<!-- Incident Card 3 (LOW) -->
+<div class="bg-surface p-md rounded-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] relative overflow-hidden border-l-4 border-surface-tint flex flex-col gap-sm">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-base">
+<h3 class="font-label-md text-label-md text-on-surface">Minor Traffic Obstruction</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 1 hr ago • Canal Road
+                            </p>
+</div>
+<div class="bg-surface-variant text-on-surface-variant px-xs py-base rounded-lg font-label-sm text-label-sm uppercase tracking-wider">
+                            Low
+                        </div>
+</div>
+<div class="flex items-center justify-between mt-xs pt-sm border-t border-surface-variant">
+<span class="font-body-sm text-body-sm text-on-surface-variant">AI Confidence Rating</span>
+<span class="font-label-md text-label-md text-on-surface">91%</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-[96px] right-container-margin z-40 bg-secondary text-on-secondary h-[52px] px-md rounded-[16px] shadow-[0_4px_16px_rgba(255,96,54,0.3)] flex items-center justify-center gap-xs hover:opacity-90 transition-opacity transform hover:scale-[1.02]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+<span class="font-label-md text-label-md font-semibold">Report Incident</span>
+</button>
+<!-- Shared Component: BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-container-margin pb-sm bg-surface dark:bg-surface-container rounded-full mx-container-margin mb-sm h-[72px] shadow-[0_4px_12px_rgba(0,0,0,0.08)] md:hidden w-[calc(100%-40px)]">
+<!-- Active Tab: Home -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim relative after:content-[''] after:w-1 after:h-1 after:bg-secondary after:rounded-full after:mt-1 hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full scale-90 transition-all duration-200 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</a>
+<!-- Inactive Tabs -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full transition-all duration-200 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">map</span>
+<span class="font-label-sm text-label-sm mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full transition-all duration-200 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">warning</span>
+<span class="font-label-sm text-label-sm mt-1">Incidents</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full transition-all duration-200 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">add_circle</span>
+<span class="font-label-sm text-label-sm mt-1">Report</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low dark:hover:bg-inverse-surface rounded-full transition-all duration-200 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">history</span>
+<span class="font-label-sm text-label-sm mt-1">Logs</span>
+</a>
+</nav>
+</body></html>
