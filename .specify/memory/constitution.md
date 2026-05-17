@@ -119,23 +119,35 @@ These agent names, responsibilities, and output contracts must not change. All s
 **Outputs:** Execution log per action, Before-state snapshot, After-state snapshot, Overall response progress %, Risk score after intervention.
 **Rules:** Visible state change to Firestore for every action, alert retraction demonstrable, risk scores in Flutter Simulation screen, execution logs match Antigravity trace logs.
 
+## UI / UX Rules
+- **Skeleton Loading:** Entire app must use skeleton loading placeholders for fetching state.
+- **Premium Look:** Maintain a clean, high-end, glassmorphic visual style.
+- **Agent Loading:** When agents are processing, show a loading circle accompanied by the agent's name.
+- **Top App Bar:** Every screen must have a Back Button on the top left corner.
+- **Screen Transitions:** All screen changes must have smooth animations/transitions.
+- **Location Request:** The main Home/Overview splash screen popup must ask the user for Location access.
+- **Map Markers:** Incidents must be color-coded by category: RED (high severity), ORANGE (medium), PURPLE (other/assessed).
+- **Mock Data via API:** No mock or sample data should be hardcoded on the UI. The app must fetch this data by calling functional API endpoints.
+
 ## Flutter App — Screen Inventory
 
 | Priority | Screen | Agent connection |
 |---|---|---|
-| P0 | Splash screen | None |
-| P0 | Signup / Login (phone OTP) | Firebase Auth |
-| P0 | OTP verification | Firebase Auth |
-| P0 | Home dashboard (map + incidents) | Agent 2 + 3 output |
-| P0 | Full map page (crisis zones + safe routes) | Agent 2 + 4 output |
-| P0 | Incidents list page | Agent 2 output |
+| P0 | Splash screen + Location Request Popup | None |
+| P0 | Home dashboard (mini map + incidents) | Agent 2 + 3 output |
+| P0 | Full map page (RED/ORANGE/PURPLE markers) | Agent 2 + 4 output |
+| P0 | AI Assistant Chat Screen | Agent 1 input / incident reporting |
 | P0 | Incident detail page (citizen + expert view toggle) | Agent 2 + 3 + 4 + 5 |
-| P0 | Report incident page | Agent 1 input |
-| P1 | Post-report confirmation screen | Agent 1 feedback |
-| P1 | Live alerts / notifications screen | Agent 5 output |
 | P1 | Simulation outcome page | Agent 5 output |
-| P1 | Agent logs page | All agents |
+| P1 | Agent logs page (old runs) | All agents |
 | P2 | Resource allocation screen | Agent 4 output |
+
+### Navigation Structure
+Bottom Navigation Bar includes exactly 4 tabs:
+1. HOME
+2. MAP
+3. AI ASSISTANT CHAT
+4. Agent Logs (old runs)
 
 ### Expert View Toggle & Citizen-facing Rules
 - Toggle on Incident Detail screen.
