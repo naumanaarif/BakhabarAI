@@ -4,14 +4,14 @@
 
 # API Framework
 fastapi==0.115.5
-uvicorn[standard]==0.32.1
+uvicorn[standard]
 
 # Google ADK (Antigravity)
 google-adk==1.2.1
 
 # Google AI / Gemini
 google-generativeai==0.8.3
-google-cloud-aiplatform==1.71.1
+google-cloud-aiplatform
 
 # Google Maps Platform
 googlemaps==4.10.0
@@ -45,9 +45,6 @@ anyio==4.7.0
 
 # Logging
 structlog==24.4.0
-
-# UUID
-uuid==1.30
 
 # Type hints
 typing-extensions==4.12.2
