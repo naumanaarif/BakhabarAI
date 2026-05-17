@@ -1,3 +1,5 @@
+<!-- SPECKIT START -->
+
 # BakhabarAI — Agent Constitution & Spec Guide
 > Read this file FIRST before writing any code, creating any file, or making any decision.
 > This is the single source of truth for the entire project.
@@ -705,3 +707,5 @@ README.md:
 
 *Last updated: BakhabarAI v1.0 — Hackathon Build*
 *Agent: Read this file on every new session before writing any code.*
+
+<!-- SPECKIT END -->
