@@ -48,8 +48,18 @@ async def fuse_and_verify_signals() -> str:
                 break
         
         if not incident_id and status == "verified":
+            # Better initial type guess for notifications
+            initial_type = "Incident"
+            content_lower = signal['content'].lower()
+            if 'flood' in content_lower or 'pani' in content_lower or 'water' in content_lower:
+                initial_type = 'flooding'
+            elif 'fire' in content_lower or 'smoke' in content_lower or 'dhuan' in content_lower:
+                initial_type = 'fire'
+            elif 'heat' in content_lower or 'garmi' in content_lower or 'temp' in content_lower:
+                initial_type = 'heatwave'
+
             incident_id = create_incident(
-                incident_type="unknown", # To be refined by DetectorAgent
+                incident_type=initial_type,
                 severity="MEDIUM",
                 confidence=0.5,
                 location_name=location_name,

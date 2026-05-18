@@ -10,6 +10,7 @@ import 'auth/signup_screen.dart';
 import '../models/incident.dart';
 import '../models/agent_log.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../services/location_service.dart';
 import '../widgets/skeleton_loader.dart';
 import 'incident_detail_screen.dart';
@@ -27,7 +28,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final LocationService _locationService = LocationService();
   late Stream<List<Incident>> _incidentsStream;
   late Stream<List<AgentTrace>> _logsStream;
-  StreamSubscription? _logsSubscription;
+  StreamSubscription? _incidentSubscription;
+  String? _lastIncidentId;
   
   bool _hasLocationPermission = false;
   bool _hasUnreadNotifications = true;
@@ -44,12 +46,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _incidentsStream = _apiService.getIncidentsStream();
     _logsStream = _apiService.getAgentLogsStream();
     
-    // Listen for new notifications
-    _logsSubscription = _logsStream.listen((logs) {
-      if (logs.isNotEmpty && mounted) {
-        setState(() {
-          _hasUnreadNotifications = true;
-        });
+    // Listen for new incident alerts
+    _incidentSubscription = _incidentsStream.listen((incidents) {
+      if (incidents.isNotEmpty && mounted) {
+        // Sort by id or timestamp if available, but for now we assume the list update is significant
+        // We'll take the first one as the most recent/relevant
+        final latestIncident = incidents.first; 
+        
+        if (_lastIncidentId != latestIncident.id) {
+          final isNew = _lastIncidentId != null;
+          _lastIncidentId = latestIncident.id;
+          
+          if (isNew) {
+            // Delay notification slightly to give DetectorAgent time to refine 'unknown' type
+            Future.delayed(const Duration(seconds: 2), () {
+              if (!mounted) return;
+              
+              // Re-fetch latest state or check if type is still unknown
+              // (Simplest way for demo is just checking the latest list again if needed,
+              // but usually 2s is enough for the next stream event to arrive with better data)
+              
+              if (latestIncident.type.toLowerCase() == 'unknown' || latestIncident.type.toLowerCase() == 'incident') {
+                 // Try to wait for one more tick or just show as 'Emergency'
+              }
+
+              setState(() {
+                _hasUnreadNotifications = true;
+              });
+
+              // Show in-app short notification (SnackBar)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(LucideIcons.alertTriangle, color: _getSeverityColor(latestIncident.severity), size: 18),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'CRISIS ALERT: ${latestIncident.type.toUpperCase()} in ${latestIncident.location.name.split(',')[0]}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.textPrimary,
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'DETAILS',
+                    textColor: AppColors.accent,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => IncidentDetailScreen(incidentId: latestIncident.id),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+
+              // Show outside-app notification
+              NotificationService().showNotification(
+                id: latestIncident.id.hashCode,
+                title: 'CRISIS ALERT: ${latestIncident.type.toUpperCase()}',
+                body: 'Detected in ${latestIncident.location.name}. Confidence: ${(latestIncident.confidence * 100).toInt()}%',
+              );
+            });
+          }
+        }
       }
     });
 
@@ -67,7 +134,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
-    _logsSubscription?.cancel();
+    _incidentSubscription?.cancel();
     super.dispose();
   }
 
@@ -726,21 +793,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
             const Divider(height: 1, color: Colors.black12),
             
-            // Notification List (Live from Agent Logs)
+            // Notification List (Live from Incidents)
             Expanded(
-              child: StreamBuilder<List<AgentTrace>>(
-                stream: _logsStream,
+              child: StreamBuilder<List<Incident>>(
+                stream: _incidentsStream,
+                initialData: const [],
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(child: Text('Error loading alerts', style: AppTextStyles.bodyMuted));
                   }
 
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                  final incidents = snapshot.data ?? [];
+                  if (incidents.isEmpty && snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator(color: AppColors.accent));
                   }
 
-                  final logs = snapshot.data ?? [];
-                  if (logs.isEmpty) {
+                  if (incidents.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -755,93 +823,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   return ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    itemCount: logs.length > 10 ? 10 : logs.length,
+                    itemCount: incidents.length,
                     itemBuilder: (context, index) {
-                      final log = logs[index];
-                      
-                      // Map log to notification icon/color
-                      IconData icon = LucideIcons.cpu;
-                      Color color = AppColors.accent;
-                      if (log.agentName.contains('Detector')) {
-                        icon = LucideIcons.waves;
-                        color = AppColors.severityHigh;
-                      } else if (log.agentName.contains('Planner')) {
-                        icon = LucideIcons.hardHat;
-                        color = AppColors.severityMedium;
-                      }
+                      final incident = incidents[index];
+                      final color = _getSeverityColor(incident.severity);
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop(); // Close sheet
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => IncidentDetailScreen(incidentId: incident.id),
                             ),
-                          ],
-                          border: Border(
-                            left: BorderSide(
-                              color: color,
-                              width: 4,
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border(
+                              left: BorderSide(
+                                color: color,
+                                width: 4,
+                              ),
                             ),
                           ),
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: color.withOpacity(0.1),
-                                shape: BoxShape.circle,
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: color.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  LucideIcons.alertTriangle,
+                                  color: color,
+                                  size: 20,
+                                ),
                               ),
-                              child: Icon(
-                                icon,
-                                color: color,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '${log.agentName} Action',
-                                          style: AppTextStyles.label.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: AppColors.textPrimary,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            incident.type.toUpperCase(),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: AppColors.textPrimary,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      Text(
-                                        '${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}',
-                                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    log.action,
-                                    style: AppTextStyles.bodyMuted.copyWith(
-                                      fontSize: 13,
-                                      color: AppColors.textMuted,
-                                      height: 1.3,
+                                        Text(
+                                          'Just now',
+                                          style: AppTextStyles.labelMuted.copyWith(fontSize: 10),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'A ${incident.severity.toLowerCase()} severity crisis detected in ${incident.location.name}. Confidence is ${(incident.confidence * 100).toInt()}%.',
+                                      style: AppTextStyles.bodyMuted.copyWith(fontSize: 13, height: 1.4),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'View Details',
+                                      style: TextStyle(
+                                        color: AppColors.accent,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },

@@ -9,11 +9,13 @@ import 'screens/map_screen.dart';
 import 'screens/incidents_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/agent_logs_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    await NotificationService().init();
   } catch (e) {
     debugPrint("Firebase initialization failed: $e. Ensure google-services.json is present for Android.");
   }

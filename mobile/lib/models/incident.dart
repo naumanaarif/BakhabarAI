@@ -22,6 +22,7 @@ class Incident {
   final double confidence;
   final int affectedPopulation;
   final String status;
+  final DateTime? timestamp;
   // Detail fields
   final int? expectedDurationHours;
   final String? peakImpactTime;
@@ -35,6 +36,7 @@ class Incident {
     required this.confidence,
     required this.affectedPopulation,
     required this.status,
+    this.timestamp,
     this.expectedDurationHours,
     this.peakImpactTime,
     this.signalSources,
@@ -49,6 +51,7 @@ class Incident {
       confidence: (json['confidence'] as num).toDouble(),
       affectedPopulation: json['affected_population'] as int,
       status: json['status'] as String,
+      timestamp: json['timestamp'] != null ? DateTime.parse(json['timestamp']) : null,
       expectedDurationHours: json['expected_duration_hours'] as int?,
       peakImpactTime: json['peak_impact_time'] as String?,
       signalSources: json['signal_sources'] != null 

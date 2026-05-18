@@ -54,6 +54,9 @@ class ApiService {
       'confidence': (data['confidence_score'] ?? 0.0).toDouble(),
       'status': data['status'] ?? 'active',
       'affected_population': data['affected_population'] ?? 0,
+      'timestamp': data['timestamp'] is Timestamp 
+          ? (data['timestamp'] as Timestamp).toDate().toIso8601String()
+          : data['timestamp'] ?? DateTime.now().toIso8601String(),
       'location': {
         'name': data['location_name'] ?? 'Unknown Location',
         'lat': geo.latitude,
@@ -74,9 +77,17 @@ class ApiService {
         .where('status', isEqualTo: 'active')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final list = snapshot.docs.map((doc) {
         return Incident.fromJson(_mapFirestoreToIncidentJson(doc));
       }).toList();
+      
+      // Sort in memory: Latest first
+      list.sort((a, b) {
+        if (a.timestamp == null) return 1;
+        if (b.timestamp == null) return -1;
+        return b.timestamp!.compareTo(a.timestamp!);
+      });
+      return list;
     });
   }
 
@@ -99,7 +110,7 @@ class ApiService {
         .snapshots()
         .map((snapshot) {
       try {
-        return snapshot.docs.map((doc) {
+        final list = snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           data['id'] = doc.id;
           if (data['timestamp'] is Timestamp) {
@@ -109,6 +120,10 @@ class ApiService {
           }
           return AgentTrace.fromJson(data);
         }).toList();
+
+        // Sort in memory: Latest first
+        list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        return list;
       } catch (e) {
         debugPrint('Error parsing agent logs: $e');
         return <AgentTrace>[];
