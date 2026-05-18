@@ -13,39 +13,12 @@ class AgentLogsScreen extends StatefulWidget {
 
 class _AgentLogsScreenState extends State<AgentLogsScreen> {
   final ApiService _apiService = ApiService();
-  bool _isLoading = true;
-  String? _error;
-  List<AgentTrace> _logs = [];
+  late Stream<List<AgentTrace>> _logsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 500));
-      final logs = await _apiService.getAgentLogs();
-      if (mounted) {
-        setState(() {
-          _logs = logs;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
+    _logsStream = _apiService.getAgentLogsStream();
   }
 
   @override
@@ -80,46 +53,45 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
         centerTitle: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.refreshCw, color: AppColors.textPrimary),
-            onPressed: _loadData,
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Text(
-                'Agent Logs',
-                style: AppTextStyles.h1.copyWith(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 28,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Real-time execution trace & reasoning engine output.',
-                style: AppTextStyles.bodyMuted,
-              ),
-              const SizedBox(height: 24),
+      body: StreamBuilder<List<AgentTrace>>(
+        stream: _logsStream,
+        builder: (context, snapshot) {
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(
+                    'Agent Logs',
+                    style: AppTextStyles.h1.copyWith(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Real-time execution trace & reasoning engine output.',
+                    style: AppTextStyles.bodyMuted,
+                  ),
+                  const SizedBox(height: 24),
 
-              // Timeline
-              _buildTimelineBody(),
-              const SizedBox(height: 120), // Space for bottom nav bar
-            ],
-          ),
-        ),
+                  // Timeline
+                  _buildTimelineBody(snapshot),
+                  const SizedBox(height: 120), // Space for bottom nav bar
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildTimelineBody() {
-    if (_isLoading) {
+  Widget _buildTimelineBody(AsyncSnapshot<List<AgentTrace>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 40),
@@ -128,7 +100,7 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
       );
     }
 
-    if (_error != null) {
+    if (snapshot.hasError) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -138,14 +110,16 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
               const SizedBox(height: 12),
               Text('Failed to load logs', style: AppTextStyles.h2),
               const SizedBox(height: 8),
-              Text(_error!, style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
+              Text(snapshot.error.toString(), style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
             ],
           ),
         ),
       );
     }
 
-    if (_logs.isEmpty) {
+    final logs = snapshot.data ?? [];
+
+    if (logs.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -178,9 +152,9 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _logs.length,
+          itemCount: logs.length,
           itemBuilder: (context, index) {
-            final log = _logs[index];
+            final log = logs[index];
             final isFirst = index == 0;
             final confidencePercent = (log.confidence * 100).toInt();
 
@@ -249,32 +223,39 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      '${log.timestamp.hour.toString().padLeft(2, '0')}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}',
-                                      style: AppTextStyles.label.copyWith(
-                                        color: AppColors.textMuted,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        log.agentName,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        '${log.timestamp.hour.toString().padLeft(2, '0')}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}',
                                         style: AppTextStyles.label.copyWith(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textMuted,
+                                          fontSize: 11,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withOpacity(0.8),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            log.agentName,
+                                            style: AppTextStyles.label.copyWith(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
@@ -299,62 +280,20 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
                               log.action,
                               style: AppTextStyles.body.copyWith(
                                 color: AppColors.textPrimary,
-                                fontSize: 13,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 12),
-
-                            // Technical Collapsible Monospace Details
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(8),
+                            
+                            // Technical details hidden by default (only show if data exists and for debugging)
+                            if (log.inputData.isNotEmpty || log.outputData.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(
+                                  'Technical trace data recorded.',
+                                  style: AppTextStyles.bodyMuted.copyWith(fontSize: 10, fontStyle: FontStyle.italic),
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'INPUT:',
-                                    style: AppTextStyles.mono.copyWith(
-                                      color: AppColors.textMuted,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    log.inputData.toString(),
-                                    style: AppTextStyles.mono.copyWith(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 10,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'OUTPUT:',
-                                    style: AppTextStyles.mono.copyWith(
-                                      color: AppColors.textMuted,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    log.outputData.toString(),
-                                    style: AppTextStyles.mono.copyWith(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 10,
-                                    ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),

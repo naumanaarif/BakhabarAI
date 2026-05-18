@@ -2,87 +2,56 @@ from fastapi import APIRouter
 from typing import List
 from agents.pipeline import run_crisis_simulation
 from tracer import tracer
+from services.firebase_service import FirebaseService
+import asyncio
 
 router = APIRouter(prefix="/api")
 
 @router.get("/incidents")
 async def get_incidents():
-    # Placeholder for returning mock incidents
-    return {
-        "incidents": [
-            {
-                "crisis_id": "c_001",
-                "type": "flood",
-                "location": {
-                    "name": "G-10, Islamabad",
-                    "lat": 33.6844,
-                    "lng": 73.0479
-                },
-                "severity": "HIGH",
-                "confidence": 0.92,
-                "affected_population": 12000,
-                "status": "active"
-            },
-            {
-                "crisis_id": "c_002",
-                "type": "heatwave",
-                "location": {
-                    "name": "I-8, Islamabad",
-                    "lat": 33.6682,
-                    "lng": 73.0768
-                },
-                "severity": "MEDIUM",
-                "confidence": 0.85,
-                "affected_population": 8500,
-                "status": "active"
+    """Fetches active incidents from Firestore."""
+    incidents = FirebaseService.get_active_incidents()
+    # Normalize GeoPoint to lat/lng for JSON serialization
+    for inc in incidents:
+        if 'location' in inc:
+            inc['location'] = {
+                "lat": inc['location'].latitude,
+                "lng": inc['location'].longitude
             }
-        ]
-    }
+    return {"incidents": incidents}
 
 @router.get("/incidents/{id}")
 async def get_incident_detail(id: str):
-    return {
-        "crisis_id": id,
-        "type": "flood",
-        "location": {
-            "name": "G-10, Islamabad",
-            "lat": 33.6844,
-            "lng": 73.0479
-        },
-        "severity": "HIGH",
-        "confidence": 0.92,
-        "affected_population": 12000,
-        "expected_duration_hours": 6,
-        "peak_impact_time": "2024-01-15T18:00:00Z",
-        "signal_sources": ["Google Weather API", "Social"],
-        "conflicting_signals": [],
-        "status": "active"
-    }
+    """Fetches a specific incident from Firestore."""
+    # We can add a get_incident_by_id to FirebaseService if needed
+    # For now, let's just filter the active ones
+    incidents = FirebaseService.get_active_incidents()
+    for inc in incidents:
+        if inc['id'] == id:
+            if 'location' in inc:
+                inc['location'] = {
+                    "lat": inc['location'].latitude,
+                    "lng": inc['location'].longitude
+                }
+            return inc
+    return {"error": "Incident not found"}
 
 @router.post("/report")
 async def submit_report(report: dict):
-    # Simulated agent processing delay happens on frontend, or we can sleep here
-    return {"status": "success", "message": "Incident report submitted and verified."}
+    """Adds a new signal to Firestore."""
+    FirebaseService.add_signal(
+        source_type="social",
+        content=report.get("message", "User Report"),
+        lat=report.get("lat", 33.6844),
+        lng=report.get("lng", 73.0479),
+        metadata={"user_report": True}
+    )
+    return {"status": "success", "message": "Incident report submitted to Firestore signals."}
 
 @router.post("/run-scenario")
 async def run_scenario(scenario: dict = None):
-    # Clear previous traces for a fresh run
+    """Triggers the agent pipeline to process Firestore state."""
     tracer.clear()
-    
-    use_mock = scenario.get("mock", False) if scenario else False
-    
-    if use_mock:
-        tracer.log("System", "mock_simulation_started", {"scenario": scenario}, {})
-        import asyncio
-        await asyncio.sleep(1)
-        tracer.log("SignalCollector", "signals_collected", {}, {"signals": ["weather_alert", "social_media_post"]})
-        await asyncio.sleep(1)
-        tracer.log("DetectorAgent", "crisis_detected", {"signals": 2}, {"type": "flood", "severity": "HIGH", "location": "G-10"})
-        return {
-            "status": "success",
-            "result": "Mock simulation completed successfully.",
-            "traces": tracer.get_traces()
-        }
     
     try:
         # Run the agent pipeline
@@ -98,7 +67,6 @@ async def run_scenario(scenario: dict = None):
         error_msg = str(e)
         stack_trace = traceback.format_exc()
         
-        # Log error to tracer so it's visible in the app
         tracer.log(
             agent_name="System",
             action="simulation_error",
@@ -106,26 +74,14 @@ async def run_scenario(scenario: dict = None):
             output_data={"error": error_msg, "traceback": stack_trace},
             confidence=0.0
         )
-        
-        print(f"Error in run_scenario: {error_msg}\n{stack_trace}")
         return {
             "status": "error",
-            "message": error_msg,
-            "traceback": stack_trace,
-            "traces": tracer.get_traces()
+            "message": error_msg
         }
 
 @router.get("/logs")
 async def get_logs():
+    """Fetches recent agent traces from the tracer instance."""
     return {
-        "traces": tracer.get_traces() if tracer.get_traces() else [
-            {
-                "timestamp": "2024-01-15T14:30:00Z",
-                "agent": "DetectorAgent",
-                "action": "classified_crisis",
-                "input": {"signals": 4, "location": "G-10"},
-                "output": {"type": "flood", "severity": "HIGH"},
-                "confidence": 0.92
-            }
-        ]
+        "traces": tracer.get_traces()
     }

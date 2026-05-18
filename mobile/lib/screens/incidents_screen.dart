@@ -17,39 +17,12 @@ class IncidentsScreen extends StatefulWidget {
 
 class _IncidentsScreenState extends State<IncidentsScreen> {
   final ApiService _apiService = ApiService();
-  bool _isLoading = true;
-  String? _error;
-  List<Incident> _incidents = [];
+  late Stream<List<Incident>> _incidentsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 500));
-      final incidents = await _apiService.getIncidents();
-      if (mounted) {
-        setState(() {
-          _incidents = incidents;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
+    _incidentsStream = _apiService.getIncidentsStream();
   }
 
   Color _getSeverityColor(String severity) {
@@ -115,104 +88,105 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.accent,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                Text(
-                  'Active Incidents',
-                  style: AppTextStyles.h1.copyWith(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 26,
+      body: StreamBuilder<List<Incident>>(
+        stream: _incidentsStream,
+        builder: (context, snapshot) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(
+                    'Active Incidents',
+                    style: AppTextStyles.h1.copyWith(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 26,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Action Buttons Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const SimulationScreen(),
+                  // Action Buttons Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const SimulationScreen(),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: Colors.white,
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ),
-                          child: const Text('Show Simulations'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ResourceAllocationScreen(),
-                              ),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.grey, width: 1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Text(
-                            'Resource Allocation',
-                            style: AppTextStyles.body.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                            child: const Text('Show Simulations'),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const ResourceAllocationScreen(),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.grey, width: 1),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: Text(
+                              'Resource Allocation',
+                              style: AppTextStyles.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
 
-                // Incidents List
-                _buildIncidentsContent(),
-                const SizedBox(height: 100), // Space for bottom nav
-              ],
+                  // Incidents Content
+                  _buildIncidentsContent(snapshot),
+                  const SizedBox(height: 100), // Space for bottom nav
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildIncidentsContent() {
-    if (_isLoading) {
+  Widget _buildIncidentsContent(AsyncSnapshot<List<Incident>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
       return Column(
         children: List.generate(3, (index) => const IncidentCardSkeleton()),
       );
     }
 
-    if (_error != null) {
+    if (snapshot.hasError) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -223,19 +197,16 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
               const SizedBox(height: 16),
               Text('Failed to load incidents', style: AppTextStyles.h2),
               const SizedBox(height: 8),
-              Text(_error!, style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Try Again'),
-              )
+              Text(snapshot.error.toString(), style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
             ],
           ),
         ),
       );
     }
 
-    if (_incidents.isEmpty) {
+    final incidents = snapshot.data ?? [];
+
+    if (incidents.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -256,9 +227,9 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _incidents.length,
+      itemCount: incidents.length,
       itemBuilder: (context, index) {
-        final incident = _incidents[index];
+        final incident = incidents[index];
         final isHigh = incident.severity.toUpperCase() == 'HIGH' || incident.severity.toUpperCase() == 'CRITICAL';
         final severityColor = _getSeverityColor(incident.severity);
         final confidencePercent = (incident.confidence * 100).toInt();
@@ -352,8 +323,12 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        '12 mins ago',
-                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
+                        'Live',
+                        style: AppTextStyles.bodyMuted.copyWith(
+                          fontSize: 12,
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -363,13 +338,18 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'AI Confidence',
-                        style: AppTextStyles.label.copyWith(
-                          color: AppColors.textMuted,
-                          fontSize: 12,
+                      Flexible(
+                        child: Text(
+                          'AI Confidence',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '$confidencePercent%',
                         style: AppTextStyles.label.copyWith(

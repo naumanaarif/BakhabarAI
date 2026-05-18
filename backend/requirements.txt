@@ -1,8 +1,10 @@
 fastapi
 uvicorn[standard]
-google-adk
+google-adk[extensions]
 google-generativeai
 google-cloud-aiplatform
+litellm
+groq
 googlemaps
 python-dotenv
 httpx

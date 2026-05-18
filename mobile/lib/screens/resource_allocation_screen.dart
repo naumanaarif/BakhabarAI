@@ -1,10 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme.dart';
+import '../models/incident.dart';
+import '../models/resource.dart';
+import '../models/agent_log.dart';
+import '../services/api_service.dart';
 import 'simulation_screen.dart';
 
-class ResourceAllocationScreen extends StatelessWidget {
+class ResourceAllocationScreen extends StatefulWidget {
   const ResourceAllocationScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ResourceAllocationScreen> createState() => _ResourceAllocationScreenState();
+}
+
+class _ResourceAllocationScreenState extends State<ResourceAllocationScreen> {
+  final ApiService _apiService = ApiService();
+  late Stream<List<Incident>> _incidentsStream;
+  late Stream<List<Resource>> _resourcesStream;
+  late Stream<List<AgentTrace>> _logsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _incidentsStream = _apiService.getIncidentsStream();
+    _resourcesStream = _apiService.getResourcesStream();
+    _logsStream = _apiService.getAgentLogsStream();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,190 +65,339 @@ class ResourceAllocationScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Text(
-                'Resource Allocation',
-                style: AppTextStyles.h1.copyWith(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 28,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Live overview of active units and critical area deployments. High priority events are currently drawing maximum available assets.',
-                style: AppTextStyles.bodyMuted,
-              ),
-              const SizedBox(height: 24),
+      body: StreamBuilder<List<Resource>>(
+        stream: _resourcesStream,
+        builder: (context, resSnapshot) {
+          return StreamBuilder<List<Incident>>(
+            stream: _incidentsStream,
+            builder: (context, incSnapshot) {
+              return StreamBuilder<List<AgentTrace>>(
+                stream: _logsStream,
+                builder: (context, logSnapshot) {
+                  if (resSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                  }
 
-              // Available Pool Card
-              Card(
-                color: Colors.white,
-                elevation: 2,
-                shadowColor: Colors.black.withOpacity(0.06),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Available Pool',
-                        style: AppTextStyles.h2.copyWith(fontSize: 20),
-                      ),
-                      const SizedBox(height: 20),
+                  final resources = resSnapshot.data ?? [];
+                  final incidents = incSnapshot.data ?? [];
+                  final logs = logSnapshot.data ?? [];
 
-                      _buildResourcePoolRow(
-                        icon: LucideIcons.activity,
-                        title: 'Ambulance',
-                        count: '12 / 45',
-                        progress: 0.26,
-                        color: AppColors.accent,
-                      ),
-                      const SizedBox(height: 16),
+                  // Find trade-off alerts from logs
+                  final tradeOffLogs = logs.where((l) => l.action.toLowerCase().contains('trade-off') || l.action.toLowerCase().contains('delay')).toList();
 
-                      // Police
-                      _buildResourcePoolRow(
-                        icon: LucideIcons.shield,
-                        title: 'Police',
-                        count: '84 / 120',
-                        progress: 0.70,
-                        color: AppColors.accent.withOpacity(0.8),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Rescue
-                      _buildResourcePoolRow(
-                        icon: LucideIcons.hardHat,
-                        title: 'Rescue',
-                        count: '4 / 30',
-                        progress: 0.13,
-                        color: AppColors.dangerRed,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Trade-off Alert Box
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border(
-                    left: BorderSide(
-                      color: AppColors.accent,
-                      width: 4,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(LucideIcons.alertTriangle, color: AppColors.accent, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: RichText(
-                        text: TextSpan(
-                          style: AppTextStyles.body.copyWith(fontSize: 14),
-                          children: [
-                            const TextSpan(
-                              text: 'Trade-off: ',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent),
+                  return SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          Text(
+                            'Resource Allocation',
+                            style: AppTextStyles.h1.copyWith(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 28,
                             ),
-                            const TextSpan(
-                              text: 'I-8 response delayed +8 mins due to G-10 flood priority.',
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Live overview of active units and critical area deployments. High priority events are currently drawing maximum available assets.',
+                            style: AppTextStyles.bodyMuted,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Available Pool Card
+                          _buildPoolCard(resources),
+                          const SizedBox(height: 16),
+
+                          // Trade-off Alert Box
+                          if (tradeOffLogs.isNotEmpty)
+                            _buildTradeOffBox(tradeOffLogs.first.action)
+                          else
+                            _buildTradeOffBox('All resources optimally assigned based on current priority.'),
+                          
+                          const SizedBox(height: 16),
+
+                          // Show Simulation Button
+                          _buildSimulationButton(),
+                          const SizedBox(height: 28),
+
+                          // Deployment sections
+                          Text(
+                            'Active Deployments',
+                            style: AppTextStyles.h2.copyWith(fontSize: 20),
+                          ),
+                          const SizedBox(height: 12),
+
+                          if (incidents.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Center(child: Text('No active deployments', style: AppTextStyles.bodyMuted)),
+                            )
+                          else
+                            ...incidents.map((incident) {
+                              final assignedResources = resources.where((r) => r.currentIncidentId == incident.id).toList();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildDeploymentCard(incident, assignedResources),
+                              );
+                            }).toList(),
+
+                          const SizedBox(height: 40),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
-              // Show Simulation Button
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SimulationScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(LucideIcons.barChart2, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Show Simulation',
-                        style: AppTextStyles.body.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
+  Widget _buildPoolCard(List<Resource> resources) {
+    final medical = resources.where((r) => r.type == 'Medical').toList();
+    final police = resources.where((r) => r.type == 'Police').toList();
+    final rescue = resources.where((r) => r.type == 'Fire' || r.type == 'Rescue').toList();
 
-              // Deployment sections
-              Text(
-                'Active Deployments',
-                style: AppTextStyles.h2.copyWith(fontSize: 20),
-              ),
-              const SizedBox(height: 12),
+    final medicalAvailable = medical.where((r) => r.status == 'available').length;
+    final policeAvailable = police.where((r) => r.status == 'available').length;
+    final rescueAvailable = rescue.where((r) => r.status == 'available').length;
 
-              // Incident Deployment 1: G-10 FLOOD
-              _buildDeploymentCard(
-                title: 'G-10 FLOOD',
-                priority: 'Priority: HIGH',
-                priorityColor: AppColors.dangerRed,
-                description: 'Massive water accumulation in sectors G-10/4 and G-10/1. Continuous monitoring required as weather models predict further rainfall.',
-                resources: [
-                  _buildResourceListItem(LucideIcons.activity, '5 Ambulances deployed to safe staging areas.', AppColors.accent),
-                  _buildResourceListItem(LucideIcons.shield, '12 Units securing perimeter and managing traffic.', AppColors.accent.withOpacity(0.8)),
-                  _buildResourceListItem(LucideIcons.hardHat, '3 Rescue boats en route to deepest sectors.', AppColors.dangerRed),
-                ],
-              ),
-              const SizedBox(height: 16),
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Available Pool',
+              style: AppTextStyles.h2.copyWith(fontSize: 20),
+            ),
+            const SizedBox(height: 20),
 
-              // Incident Deployment 2: F-8 POWER GRID FAILURE
-              _buildDeploymentCard(
-                title: 'F-8 POWER GRID FAILURE',
-                priority: 'Priority: MODERATE',
-                priorityColor: AppColors.severityMedium,
-                description: 'Localized blackout affecting commercial zones. Auxiliary power units currently sustaining hospital operations.',
-                resources: [
-                  _buildResourceListItem(LucideIcons.cpu, '2 Engineering crews dispatched for diagnostics.', AppColors.textMuted),
-                  _buildResourceListItem(LucideIcons.shield, '4 Units providing localized security details.', AppColors.accent.withOpacity(0.8)),
-                ],
-              ),
-              const SizedBox(height: 40),
-            ],
+            _buildResourcePoolRow(
+              icon: LucideIcons.activity,
+              title: 'Medical',
+              count: '$medicalAvailable / ${medical.length}',
+              progress: medical.isEmpty ? 0 : medicalAvailable / medical.length,
+              color: AppColors.accent,
+            ),
+            const SizedBox(height: 16),
+
+            _buildResourcePoolRow(
+              icon: LucideIcons.shield,
+              title: 'Police',
+              count: '$policeAvailable / ${police.length}',
+              progress: police.isEmpty ? 0 : policeAvailable / police.length,
+              color: AppColors.accent.withOpacity(0.8),
+            ),
+            const SizedBox(height: 16),
+
+            _buildResourcePoolRow(
+              icon: LucideIcons.hardHat,
+              title: 'Rescue',
+              count: '$rescueAvailable / ${rescue.length}',
+              progress: rescue.isEmpty ? 0 : rescueAvailable / rescue.length,
+              color: AppColors.dangerRed,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradeOffBox(String message) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.accent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: const Border(
+          left: BorderSide(
+            color: AppColors.accent,
+            width: 4,
           ),
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.alertTriangle, color: AppColors.accent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: AppTextStyles.body.copyWith(fontSize: 14),
+                children: [
+                  const TextSpan(
+                    text: 'Trade-off: ',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent),
+                  ),
+                  TextSpan(text: message),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimulationButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const SimulationScreen(),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(LucideIcons.barChart2, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Show Simulation',
+              style: AppTextStyles.body.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeploymentCard(Incident incident, List<Resource> assignedResources) {
+    final isHigh = incident.severity.toUpperCase() == 'HIGH' || incident.severity.toUpperCase() == 'CRITICAL';
+    final priorityColor = isHigh ? AppColors.dangerRed : AppColors.severityMedium;
+
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border(
+            left: BorderSide(
+              color: priorityColor,
+              width: 4,
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${incident.location.name.split(',')[0]} ${incident.type.toUpperCase()}',
+                    style: AppTextStyles.h2.copyWith(fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: priorityColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Priority: ${incident.severity}',
+                    style: AppTextStyles.label.copyWith(
+                      color: priorityColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Monitoring active in ${incident.location.name}. Resources deployed to mitigate impact.',
+              style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+
+            // Resources list
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade100),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Assigned Resources',
+                    style: AppTextStyles.label.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (assignedResources.isEmpty)
+                    Text('Awaiting dispatch...', style: AppTextStyles.bodyMuted.copyWith(fontSize: 12))
+                  else
+                    ...assignedResources.map((res) {
+                      IconData icon;
+                      Color color;
+                      switch (res.type) {
+                        case 'Medical':
+                          icon = LucideIcons.activity;
+                          color = AppColors.accent;
+                          break;
+                        case 'Police':
+                          icon = LucideIcons.shield;
+                          color = AppColors.accent.withOpacity(0.8);
+                          break;
+                        case 'Fire':
+                        case 'Rescue':
+                          icon = LucideIcons.hardHat;
+                          color = AppColors.dangerRed;
+                          break;
+                        default:
+                          icon = LucideIcons.package;
+                          color = AppColors.textMuted;
+                      }
+                      return _buildResourceListItem(icon, res.name, color);
+                    }).toList(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -271,97 +442,6 @@ class ResourceAllocationScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDeploymentCard({
-    required String title,
-    required String priority,
-    required Color priorityColor,
-    required String description,
-    required List<Widget> resources,
-  }) {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.06),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border(
-            left: BorderSide(
-              color: priorityColor,
-              width: 4,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: AppTextStyles.h2.copyWith(fontSize: 16),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: priorityColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    priority,
-                    style: AppTextStyles.label.copyWith(
-                      color: priorityColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-
-            // Resources list
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade100),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Assigned Resources',
-                    style: AppTextStyles.label.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...resources,
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

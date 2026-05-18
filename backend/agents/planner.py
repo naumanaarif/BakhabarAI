@@ -1,28 +1,56 @@
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
-from tools.maps_tool import get_distance_matrix
+from tools.firebase_tools import query_active_incidents, get_resources, assign_resource_to_incident
+from tracer import tracer
 from .model_config import get_model
 import json
 
+async def optimize_resources() -> str:
+    """
+    Analyzes active incidents and available resources, performs trade-offs,
+    and updates Firestore allocations.
+    """
+    incidents = query_active_incidents()
+    # Sort incidents by severity (HIGH > MEDIUM > LOW)
+    incidents.sort(key=lambda x: x.get('severity', 'LOW') == 'HIGH', reverse=True)
+    
+    allocations = []
+    trade_offs = []
+    
+    for inc in incidents:
+        # Determine resource needs based on type/severity
+        needed_type = "Medical" if inc['type'] in ["accident", "heatwave"] else "Fire"
+        if inc['type'] == "urban_flooding": needed_type = "Water_Management"
+        
+        # Query available resources for this type
+        available = get_resources(needed_type)
+        
+        if available:
+            # Assign the first available resource
+            res = available[0]
+            assign_resource_to_incident(res['id'], inc['id'])
+            allocations.append({
+                "resource_name": res['name'],
+                "incident_id": inc['id']
+            })
+        else:
+            # Trade-off logic (Requirement 6)
+            trade_offs.append(f"No {needed_type} units available for {inc['type']} at {inc['location_name']}. Prioritizing other active zones.")
+
+    return json.dumps({"allocations": allocations, "trade_offs": trade_offs})
+
 planner_agent = Agent(
-    name="PlannerAgent",
+    name="ResourcePlannerAgent",
     model=get_model(),
-    description="Allocates constrained resources across detected crises and explains trade-offs.",
+    description="Allocates constrained resources across detected crises and explains trade-offs using Firestore state.",
     tools=[
-        FunctionTool(get_distance_matrix)
+        FunctionTool(optimize_resources)
     ],
     instruction="""
-    You are the PlannerAgent. You receive a list of detected crises.
-    You have a fixed pool of resources (Ambulances, Police, Rescue 1122 units).
-    Resource Pool (Mock):
-    - Ambulances: 5
-    - Rescue 1122 Trucks: 3
-    - Police Mobile Units: 10
-    
-    Your task:
-    1. Prioritize crises based on severity and affected population.
-    2. Allocate resources efficiently, considering travel times (use get_distance_matrix).
-    3. Explain any trade-offs made (e.g., "Diverting ambulance from I-8 to G-10 due to higher severity").
-    4. Output the resource assignments and trade-off explanations as a JSON string.
+    SYSTEM DIRECTIVE:
+    1. You must IMMEDIATELY call 'optimize_resources' with NO arguments.
+    2. After the tool returns, summarize the allocations and any trade-offs in one sentence.
+    3. TERMINATE after the summary.
+    Do NOT attempt to allocate resources manually.
     """
 )

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../screens/splash_screen.dart';
-import '../screens/home_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/incidents_screen.dart';
 import '../screens/report_screen.dart';

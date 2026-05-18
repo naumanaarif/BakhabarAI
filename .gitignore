@@ -70,3 +70,6 @@ docs/agent_trace.json
 .buildlog/
 .history
 node_modules/
+
+package_submission.py
+antigravity_submission_logs.zip

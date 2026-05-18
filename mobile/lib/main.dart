@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'core/theme.dart';
 import 'core/router.dart';
 import 'widgets/bottom_nav_bar.dart';
@@ -9,7 +10,13 @@ import 'screens/incidents_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/agent_logs_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase initialization failed: $e. Ensure google-services.json is present for Android.");
+  }
   runApp(const ProviderScope(child: BakhabarApp()));
 }
 

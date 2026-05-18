@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,6 +8,7 @@ import '../core/theme.dart';
 import '../core/auth_provider.dart';
 import 'auth/signup_screen.dart';
 import '../models/incident.dart';
+import '../models/agent_log.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../widgets/skeleton_loader.dart';
@@ -23,9 +25,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ApiService _apiService = ApiService();
   final LocationService _locationService = LocationService();
-  bool _isLoading = true;
-  String? _error;
-  List<Incident> _incidents = [];
+  late Stream<List<Incident>> _incidentsStream;
+  late Stream<List<AgentTrace>> _logsStream;
+  StreamSubscription? _logsSubscription;
+  
   bool _hasLocationPermission = false;
   bool _hasUnreadNotifications = true;
   GoogleMapController? _mapController;
@@ -38,7 +41,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _incidentsStream = _apiService.getIncidentsStream();
+    _logsStream = _apiService.getAgentLogsStream();
+    
+    // Listen for new notifications
+    _logsSubscription = _logsStream.listen((logs) {
+      if (logs.isNotEmpty && mounted) {
+        setState(() {
+          _hasUnreadNotifications = true;
+        });
+      }
+    });
+
     Geolocator.checkPermission().then((permission) {
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
         if (mounted) setState(() => _hasLocationPermission = true);
@@ -49,6 +63,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _showLocationPopup();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _logsSubscription?.cancel();
+    super.dispose();
   }
 
   void _showLocationPopup() {
@@ -74,98 +94,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.location_on_rounded,
-                  size: 64,
-                  color: AppColors.accent,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Enable Location',
-                  style: AppTextStyles.h1.copyWith(fontSize: 22),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'BakhabarAI needs your location to detect crises in your area and send timely alerts.',
-                  style: AppTextStyles.bodyMuted,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.of(dialogContext).pop();
-                    final granted = await _locationService.handleLocationPermission();
-                    if (granted) {
-                      setState(() {
-                        _hasLocationPermission = true;
-                      });
-                      final pos = await _locationService.getCurrentPosition();
-                      if (pos != null && _mapController != null) {
-                        _mapController!.animateCamera(
-                          CameraUpdate.newLatLngZoom(
-                            LatLng(pos.latitude, pos.longitude),
-                            14.0,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                    size: 64,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Enable Location',
+                    style: AppTextStyles.h1.copyWith(fontSize: 22),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'BakhabarAI needs your location to detect crises in your area and send timely alerts.',
+                    style: AppTextStyles.bodyMuted,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      final granted = await _locationService.handleLocationPermission();
+                      if (granted) {
+                        setState(() {
+                          _hasLocationPermission = true;
+                        });
+                        final pos = await _locationService.getCurrentPosition();
+                        if (pos != null && _mapController != null) {
+                          _mapController!.animateCamera(
+                            CameraUpdate.newLatLngZoom(
+                              LatLng(pos.latitude, pos.longitude),
+                              14.0,
+                            ),
+                          );
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Location access granted! Live tracking enabled.'),
+                            backgroundColor: AppColors.successGreen,
                           ),
                         );
                       }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Location access granted! Live tracking enabled.'),
-                          backgroundColor: AppColors.successGreen,
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Allow Access'),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: Text(
-                    'Not Now',
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textMuted,
-                      fontWeight: FontWeight.w600,
+                    },
+                    child: const Text('Allow Access'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                    },
+                    child: Text(
+                      'Not Now',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
     );
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 500));
-      final incidents = await _apiService.getIncidents();
-      if (mounted) {
-        setState(() {
-          _incidents = incidents;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   Color _getSeverityColor(String severity) {
@@ -301,7 +298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   image: const DecorationImage(
                     image: NetworkImage(
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUKmia2wx8eVAvXT0lkvLLWAjIb20DQWVZINsTAYmYbObi-tD1dc0cTtLwf2elMnGAuQuc-ZMMX66aSTrhoYwO8diUfnlDxC-hc2-F3HQiSB8EPCsNTSpkUhBqlW4lxb9ylebE-5S9Ofs_DajW-sIjJVYD3XpfwxhQBq5U5hYwq5UOvJd0VYsFKvm382WYUfH3p9PkZUucNsnxf-3wzNtYPpQNQTX4EdDRavqEYy4YxPuW2p6mUTXEyGh7_ZZ9EG_sZNQ0Ue72SA',
+                      'https://ui-avatars.com/api/?name=User&background=random',
                     ),
                     fit: BoxFit.cover,
                   ),
@@ -346,157 +343,169 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.accent,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                // Live Mini-Map Preview Card
-                Container(
-                  height: 250,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      )
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      children: [
-                        GoogleMap(
-                          initialCameraPosition: _initialCameraPosition,
-                          zoomControlsEnabled: false,
-                          myLocationEnabled: _hasLocationPermission,
-                          myLocationButtonEnabled: false,
-                          zoomGesturesEnabled: false,
-                          scrollGesturesEnabled: false,
-                          tiltGesturesEnabled: false,
-                          rotateGesturesEnabled: false,
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                          },
-                        ),
-                        // Overlay glass panel
-                        Positioned(
-                          bottom: 12,
-                          left: 12,
-                          right: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withOpacity(0.3)),
+      body: StreamBuilder<List<Incident>>(
+        stream: _incidentsStream,
+        builder: (context, snapshot) {
+          final incidents = snapshot.data ?? [];
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _incidentsStream = _apiService.getIncidentsStream();
+              });
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    // Live Mini-Map Preview Card
+                    Container(
+                      height: 250,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          )
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Stack(
+                          children: [
+                            RepaintBoundary(
+                              child: GoogleMap(
+                                initialCameraPosition: _initialCameraPosition,
+                                zoomControlsEnabled: false,
+                                myLocationEnabled: _hasLocationPermission,
+                                myLocationButtonEnabled: false,
+                                zoomGesturesEnabled: false,
+                                scrollGesturesEnabled: false,
+                                tiltGesturesEnabled: false,
+                                rotateGesturesEnabled: false,
+                                onMapCreated: (controller) {
+                                  _mapController = controller;
+                                },
+                              ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
+                            // Overlay glass panel
+                            Positioned(
+                              bottom: 12,
+                              left: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Icon(LucideIcons.mapPin, color: AppColors.accent, size: 18),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Monitoring Zone Alpha',
-                                      style: AppTextStyles.label.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
-                                      ),
+                                    Row(
+                                      children: [
+                                        const Icon(LucideIcons.mapPin, color: AppColors.accent, size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Monitoring Zone Alpha',
+                                          style: AppTextStyles.label.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.dangerRed,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${incidents.length} Active',
+                                          style: AppTextStyles.bodyMuted.copyWith(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.dangerRed,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${_incidents.length} Active',
-                                      style: AppTextStyles.bodyMuted.copyWith(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Active Incidents list preview header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Active Incidents',
+                          style: AppTextStyles.h1.copyWith(
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontSize: 22,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Navigate to full list screen
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const IncidentsScreen(),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'View All',
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                    const SizedBox(height: 12),
 
-                // Active Incidents list preview header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Active Incidents',
-                      style: AppTextStyles.h1.copyWith(
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 22,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Navigate to full list screen
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const IncidentsScreen(),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        'View All',
-                        style: AppTextStyles.label.copyWith(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    // Incident list preview
+                    _buildPreviewList(snapshot),
+                    const SizedBox(height: 120), // Space for FAB and bottom navigation
                   ],
                 ),
-                const SizedBox(height: 12),
-
-                // Incident list preview
-                _buildPreviewList(),
-                const SizedBox(height: 120), // Space for FAB and bottom navigation
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPreviewList() {
-    if (_isLoading) {
+  Widget _buildPreviewList(AsyncSnapshot<List<Incident>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
       return Column(
         children: List.generate(2, (index) => const IncidentCardSkeleton()),
       );
     }
 
-    if (_error != null) {
+    if (snapshot.hasError) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -506,14 +515,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 8),
               Text('Error loading preview', style: AppTextStyles.h2),
               const SizedBox(height: 4),
-              Text(_error!, style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
+              Text(snapshot.error.toString(), style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
             ],
           ),
         ),
       );
     }
 
-    if (_incidents.isEmpty) {
+    final incidents = snapshot.data ?? [];
+
+    if (incidents.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
@@ -534,7 +545,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     // Show up to 3 incidents as a preview
-    final previewList = _incidents.take(3).toList();
+    final previewList = incidents.take(3).toList();
 
     return Column(
       children: previewList.map((incident) {
@@ -609,7 +620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const Icon(LucideIcons.clock, size: 14, color: AppColors.textMuted),
                       const SizedBox(width: 4),
                       Text(
-                        '12 mins ago • ${incident.location.name}',
+                        'Live • ${incident.location.name}',
                         style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -622,10 +633,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'AI Confidence Rating',
-                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
+                      Flexible(
+                        child: Text(
+                          'AI Confidence Rating',
+                          style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '$confidencePercent%',
                         style: AppTextStyles.label.copyWith(
@@ -648,41 +664,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() {
       _hasUnreadNotifications = false;
     });
-
-    final List<Map<String, dynamic>> notifications = [
-      {
-        'title': 'Urban Flood Detected (G-10)',
-        'message': 'SignalCollector normalized WhatsApp report: heavy rain & water logging in G-10. Credibility: 0.95.',
-        'time': '5 mins ago',
-        'type': 'incident',
-        'icon': LucideIcons.waves,
-        'color': AppColors.severityHigh,
-      },
-      {
-        'title': 'Resource Allocation Dispatch',
-        'message': 'PlannerAgent automatically dispatched 3 Ambulances and 2 Rescue Squads to G-10 Flood area.',
-        'time': '8 mins ago',
-        'type': 'resource',
-        'icon': LucideIcons.hardHat,
-        'color': AppColors.severityMedium,
-      },
-      {
-        'title': 'Simulation Model Completed',
-        'message': 'ExecutorAgent executed simulation. High traffic reroutes triggered via Kashmir Highway.',
-        'time': '12 mins ago',
-        'type': 'sim',
-        'icon': LucideIcons.cpu,
-        'color': AppColors.accent,
-      },
-      {
-        'title': 'False Alarm Clearance (I-8)',
-        'message': 'ReporterAgent issued alert cancellation: Utility sensor checks confirm standard dry conditions in I-8.',
-        'time': '1 hour ago',
-        'type': 'incident',
-        'icon': LucideIcons.checkCircle,
-        'color': AppColors.severityLow,
-      },
-    ];
 
     showModalBottomSheet(
       context: context,
@@ -745,86 +726,125 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 16),
             const Divider(height: 1, color: Colors.black12),
             
-            // Notification List
+            // Notification List (Live from Agent Logs)
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  final noti = notifications[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border(
-                        left: BorderSide(
-                          color: noti['color'] as Color,
-                          width: 4,
-                        ),
+              child: StreamBuilder<List<AgentTrace>>(
+                stream: _logsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error loading alerts', style: AppTextStyles.bodyMuted));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                  }
+
+                  final logs = snapshot.data ?? [];
+                  if (logs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.bellOff, size: 48, color: AppColors.textMuted.withOpacity(0.3)),
+                          const SizedBox(height: 16),
+                          Text('No new alerts', style: AppTextStyles.bodyMuted),
+                        ],
                       ),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: (noti['color'] as Color).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            noti['icon'] as IconData,
-                            color: noti['color'] as Color,
-                            size: 20,
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    itemCount: logs.length > 10 ? 10 : logs.length,
+                    itemBuilder: (context, index) {
+                      final log = logs[index];
+                      
+                      // Map log to notification icon/color
+                      IconData icon = LucideIcons.cpu;
+                      Color color = AppColors.accent;
+                      if (log.agentName.contains('Detector')) {
+                        icon = LucideIcons.waves;
+                        color = AppColors.severityHigh;
+                      } else if (log.agentName.contains('Planner')) {
+                        icon = LucideIcons.hardHat;
+                        color = AppColors.severityMedium;
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border(
+                            left: BorderSide(
+                              color: color,
+                              width: 4,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                icon,
+                                color: color,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      noti['title'] as String,
-                                      style: AppTextStyles.label.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: AppColors.textPrimary,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${log.agentName} Action',
+                                          style: AppTextStyles.label.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Text(
+                                        '${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}',
+                                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 11),
+                                      ),
+                                    ],
                                   ),
+                                  const SizedBox(height: 6),
                                   Text(
-                                    noti['time'] as String,
-                                    style: AppTextStyles.bodyMuted.copyWith(fontSize: 11),
+                                    log.action,
+                                    style: AppTextStyles.bodyMuted.copyWith(
+                                      fontSize: 13,
+                                      color: AppColors.textMuted,
+                                      height: 1.3,
+                                    ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                noti['message'] as String,
-                                style: AppTextStyles.bodyMuted.copyWith(
-                                  fontSize: 13,
-                                  color: AppColors.textMuted,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),

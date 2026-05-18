@@ -85,7 +85,7 @@ class _AiAssistantChatScreenState extends State<AiAssistantChatScreen> {
         body: Center(
           child: SingleChildScrollView(
             child: OtpScreen(
-              onAuthenticated: () {
+              onAuthenticated: (name) {
                 setState(() => _isAuthenticated = true);
               },
             ),
