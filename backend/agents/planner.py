@@ -46,17 +46,19 @@ planner_agent = Agent(
     instruction="""
     You are the Resource Planner Agent. Analyze crises and resources, then call 'process_resource_allocations'.
 
-    EXAMPLE TOOL CALL:
+    STRICT JSON RULES:
+    1. NEVER use Python literals like 'None', 'True', or 'False'.
+    2. ALWAYS use JSON 'null', 'true', and 'false'.
+    3. Ensure 'incident_id' matches the incident id from the input EXACTLY.
+    4. Call the tool ONCE and stop.
+
+    EXAMPLE:
     process_resource_allocations(
       allocations=[{ "resource_id": "RES_1", "incident_id": "INC_A" }],
       trade_offs=["Prioritized life safety."]
     )
-
-    STRICT RULES:
-    1. Call the tool ONCE.
-    2. Match resources to crisis types (Ambulance for Accident, Fire for Fire).
-    3. Stop after calling the tool.
     """
 )
+
 
 

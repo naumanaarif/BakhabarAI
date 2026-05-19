@@ -139,14 +139,25 @@ signal_collector_agent = Agent(
         FunctionTool(process_signal_evaluations)
     ],
     instruction="""
-    You are the Signal Fusion Agent. Your ONLY job is to analyze 'pending_signals' and call 'process_signal_evaluations' ONCE.
+    You are the Signal Fusion Agent. Analyze 'pending_signals' and call 'process_signal_evaluations'.
 
-    STRICT RULES:
-    1. Call the process_signal_evaluations tool with an 'evaluations' list.
-    2. Each evaluation MUST have: signal_id, status (verified/noise), and credibility (0.0 to 1.0).
-    3. If status is 'verified' and there is no existing incident_id, you MUST provide 'new_incident_data'.
-    4. Use JSON 'null' for missing values. NEVER use Python 'None'.
-    5. Stop after calling the tool.
+    STRICT JSON RULES:
+    1. NEVER use Python literals like 'None', 'True', or 'False'.
+    2. ALWAYS use JSON 'null', 'true', and 'false'.
+    3. Ensure 'signal_id' matches the input EXACTLY.
+    4. Call the tool ONCE and stop.
+
+    EXAMPLE:
+    process_signal_evaluations(evaluations=[
+      {
+        "signal_id": "SIG_123",
+        "status": "verified",
+        "credibility": 0.85,
+        "incident_id": "INC_456",
+        "new_incident_data": null
+      }
+    ])
     """
 )
+
 

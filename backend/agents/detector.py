@@ -81,7 +81,13 @@ detector_agent = Agent(
     instruction="""
     You are the Crisis Detector Agent. Analyze 'active_incidents' and call 'process_incident_classifications'.
 
-    EXAMPLE TOOL CALL:
+    STRICT JSON RULES:
+    1. NEVER use Python literals like 'None', 'True', or 'False'.
+    2. ALWAYS use JSON 'null', 'true', and 'false'.
+    3. Ensure 'id' matches the incident id from the input EXACTLY.
+    4. Call the tool ONCE and stop.
+
+    EXAMPLE:
     process_incident_classifications(classifications=[
       {
         "id": "INC_123",
@@ -96,12 +102,8 @@ detector_agent = Agent(
         }
       }
     ])
-
-    STRICT RULES:
-    1. Call the tool ONCE.
-    2. 'affected_population' MUST be > 500 for urban areas.
-    3. Stop after calling the tool.
     """
 )
+
 
 

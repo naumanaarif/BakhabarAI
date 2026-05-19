@@ -103,7 +103,13 @@ executor_agent = Agent(
     instruction="""
     You are the Simulation Agent. Analyze incidents and call 'process_simulations_and_messages'.
 
-    EXAMPLE TOOL CALL:
+    STRICT JSON RULES:
+    1. NEVER use Python literals like 'None', 'True', or 'False'.
+    2. ALWAYS use JSON 'null', 'true', and 'false'.
+    3. Ensure 'incident_id' matches the incident id from the input EXACTLY.
+    4. Call the tool ONCE and stop.
+
+    EXAMPLE:
     process_simulations_and_messages(simulations=[
       {
         "incident_id": "INC_123",
@@ -121,13 +127,8 @@ executor_agent = Agent(
         }
       }
     ])
-
-    STRICT RULES:
-    1. Call the tool ONCE.
-    2. 'impact' MUST be an object, NOT a string.
-    3. 'notifications' MUST have: public, hospitals, utility_providers.
-    4. Stop after calling the tool.
     """
 )
+
 
 

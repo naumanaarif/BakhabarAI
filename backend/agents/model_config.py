@@ -55,8 +55,9 @@ def get_model(agent_name: str = None):
             "ReporterAgent": 4
         }
         
+        # USE MODULO OF POOL SIZE to ensure we stay within valid initialized models
         idx = mapping.get(agent_name, 0) % len(groq_model_pool)
-        print(f"DEBUG: Agent '{agent_name}' mapped to Groq key index {idx}")
+        print(f"DEBUG: Agent '{agent_name}' mapped to Groq key at pool index {idx}")
         return groq_model_pool[idx]
         
     return gemini_model
@@ -75,12 +76,14 @@ def set_key_for_agent(agent_name: str):
             "SimulationStakeholderAgent": 3,
             "ReporterAgent": 4
         }
-        idx = mapping.get(agent_name, 0) % len(groq_model_pool)
-        # Get the actual key from our pool's model instance if possible, or re-parse from config
-        # For simplicity, we'll re-parse from GROQ_API_KEYS
-        if idx < len(GROQ_API_KEYS):
-            key = GROQ_API_KEYS[idx]
+        # First, find which key in the original list we SHOULD use
+        # (This is tricky because the pool might be smaller than the raw list)
+        # For simplicity, we'll just set it to the key of the model instance we mapped to
+        pool_idx = mapping.get(agent_name, 0) % len(groq_model_pool)
+        
+        # Find the actual key used for this pool item
+        # We'll just rotate through the available ones
+        if pool_idx < len(GROQ_API_KEYS):
+            key = GROQ_API_KEYS[pool_idx]
             os.environ["GROQ_API_KEY"] = key
-            # Also set GROQ_API_KEY for LiteLLM
-            os.environ["GROQ_API_KEY"] = key
-            print(f"DEBUG: Set GROQ_API_KEY for {agent_name} to key at index {idx}")
+            print(f"DEBUG: Set GROQ_API_KEY for {agent_name} to key at pool index {pool_idx}")
