@@ -6,19 +6,18 @@ from tools.firebase_tools import query_active_incidents, update_incident_details
 from tracer import tracer
 from .model_config import get_model
 
-async def process_incident_classifications(payload: dict = None, **kwargs) -> str:
+async def process_incident_classifications(classifications: list = None, **kwargs) -> str:
     """
     Commits your detailed crisis classification.
     """
     import re
-    # DANGEROUS HALLUCINATION FIX: Strip any <function=...> tags if the AI nested them
-    if payload is None:
-        payload = kwargs
-    elif isinstance(payload, str):
-        try: payload = json.loads(payload)
-        except: payload = {}
+    
+    if classifications is None and "classifications" in kwargs:
+        classifications = kwargs["classifications"]
+    elif isinstance(classifications, str):
+        try: classifications = json.loads(classifications).get("classifications", [])
+        except: classifications = []
 
-    classifications = payload.get("classifications", [])
     if isinstance(classifications, dict) and "classifications" in classifications:
         classifications = classifications["classifications"]
     
@@ -63,27 +62,25 @@ detector_agent = Agent(
 
     REQUIRED JSON FORMAT:
     {
-      "payload": {
-        "classifications": [
-          {
-            "id": "INCIDENT_ID_HERE",
-            "type": "accident",
-            "severity": "HIGH",
-            "affected_population": 1500,
-            "expected_duration_hours": 12,
-            "evolution_prediction": {
-              "duration_hours": 12,
-              "peak_time": "2026-05-19T20:00:00",
-              "spread_risk": "LOW"
-            }
+      "classifications": [
+        {
+          "id": "INCIDENT_ID_HERE",
+          "type": "accident",
+          "severity": "HIGH",
+          "affected_population": 1500,
+          "expected_duration_hours": 12,
+          "evolution_prediction": {
+            "duration_hours": 12,
+            "peak_time": "2026-05-19T20:00:00",
+            "spread_risk": "LOW"
           }
-        ]
-      }
+        }
+      ]
     }
 
     STRICT RULES:
     1. Call the process_incident_classifications tool.
-    2. Pass the 'payload' parameter as an object exactly matching the format above.
+    2. Pass the 'classifications' parameter as a list of objects exactly matching the format above.
     3. 'affected_population' MUST be a realistic estimate. NEVER use 0. If population is unknown, estimate at least 800 for urban areas.
     4. Stop after calling the tool.
     """

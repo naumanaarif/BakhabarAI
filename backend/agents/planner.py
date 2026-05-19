@@ -6,7 +6,7 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def process_resource_allocations(payload: dict = None, **kwargs) -> str:
+async def process_resource_allocations(allocations: list = None, trade_offs: list = None, **kwargs) -> str:
     """
     Commits your resource allocation decisions and trade-off rationale.
     """
@@ -18,17 +18,20 @@ async def process_resource_allocations(payload: dict = None, **kwargs) -> str:
             val = re.sub(r'</function>', '', val)
         return val
 
-    if payload is None:
-        payload = kwargs
-    elif isinstance(payload, str):
-        try: payload = json.loads(payload)
-        except: payload = {}
+    if allocations is None and "allocations" in kwargs:
+        allocations = kwargs["allocations"]
+    elif isinstance(allocations, str):
+        try: allocations = json.loads(allocations).get("allocations", [])
+        except: allocations = []
 
-    allocations = payload.get("allocations", [])
     if isinstance(allocations, dict) and "allocations" in allocations:
         allocations = allocations["allocations"]
 
-    trade_offs = payload.get("trade_offs", [])
+    if trade_offs is None and "trade_offs" in kwargs:
+        trade_offs = kwargs["trade_offs"]
+    elif isinstance(trade_offs, str):
+        try: trade_offs = json.loads(trade_offs).get("trade_offs", [])
+        except: trade_offs = []
     if isinstance(trade_offs, dict) and "trade_offs" in trade_offs:
         trade_offs = trade_offs["trade_offs"]
     
@@ -53,21 +56,19 @@ planner_agent = Agent(
 
     REQUIRED JSON FORMAT:
     {
-      "payload": {
-        "allocations": [
-          { "resource_id": "RES_123", "incident_id": "INC_456" }
-        ],
-        "trade_offs": [
-          "Prioritized the high-severity incident over the minor one."
-        ]
-      }
+      "allocations": [
+        { "resource_id": "RES_123", "incident_id": "INC_456" }
+      ],
+      "trade_offs": [
+        "Prioritized the high-severity incident over the minor one."
+      ]
     }
 
     STRICT RULES:
     1. Call the process_resource_allocations tool.
     2. ONLY reason about the incidents provided in the current prompt. Do NOT mention 'floods' unless a flood is actually present.
     3. Match resources (e.g. Medical for accidents, Fire for wildfires).
-    4. Pass the 'payload' parameter exactly matching the JSON format above.
+    4. Pass 'allocations' and 'trade_offs' parameters exactly matching the JSON format above.
     5. Stop after calling the tool.
     """
 )

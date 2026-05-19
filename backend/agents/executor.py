@@ -6,19 +6,17 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def process_simulations_and_messages(payload: dict = None, **kwargs) -> str:
+async def process_simulations_and_messages(simulations: list = None, **kwargs) -> str:
     """
     Commits your response impact simulations and multi-stakeholder notifications.
     """
     import re
-    # DANGEROUS HALLUCINATION FIX: Strip any <function=...> tags if the AI nested them
-    if payload is None:
-        payload = kwargs
-    elif isinstance(payload, str):
-        try: payload = json.loads(payload)
-        except: payload = {}
+    if simulations is None and "simulations" in kwargs:
+        simulations = kwargs["simulations"]
+    elif isinstance(simulations, str):
+        try: simulations = json.loads(simulations).get("simulations", [])
+        except: simulations = []
 
-    simulations = payload.get("simulations", [])
     if isinstance(simulations, dict) and "simulations" in simulations:
         simulations = simulations["simulations"]
     
@@ -63,30 +61,28 @@ executor_agent = Agent(
 
     REQUIRED JSON FORMAT:
     {
-      "payload": {
-        "simulations": [
-          {
-            "incident_id": "INC_123",
-            "action_type": "Public Alert & Medical Dispatch",
-            "description": "Deployment of ambulances and traffic detours.",
-            "impact": {
-              "before_state": "High traffic congestion and unverified casualties.",
-              "after_state": "Traffic diverted; 2 medical units on scene.",
-              "improvement_metrics": { "response_time_reduction": "15 min", "safety_boost": "40%" }
-            },
-            "notifications": {
-              "public": "AVOID Super Highway. Use alternative routes.",
-              "hospitals": "Accident report: 2 units incoming. ETA 10 mins.",
-              "utility_providers": "No power/water disruptions expected."
-            }
+      "simulations": [
+        {
+          "incident_id": "INC_123",
+          "action_type": "Public Alert & Medical Dispatch",
+          "description": "Deployment of ambulances and traffic detours.",
+          "impact": {
+            "before_state": "High traffic congestion and unverified casualties.",
+            "after_state": "Traffic diverted; 2 medical units on scene.",
+            "improvement_metrics": { "response_time_reduction": "15 min", "safety_boost": "40%" }
+          },
+          "notifications": {
+            "public": "AVOID Super Highway. Use alternative routes.",
+            "hospitals": "Accident report: 2 units incoming. ETA 10 mins.",
+            "utility_providers": "No power/water disruptions expected."
           }
-        ]
-      }
+        }
+      ]
     }
 
     STRICT RULES:
     1. Call the process_simulations_and_messages tool.
-    2. Pass the 'payload' parameter exactly matching the JSON format above.
+    2. Pass the 'simulations' parameter exactly matching the JSON format above.
     3. Notifications MUST NEVER BE NULL. If no action is needed, write 'No specific action required' or 'Monitoring status'.
     4. Stop after calling the tool.
     """

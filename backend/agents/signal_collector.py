@@ -13,7 +13,7 @@ from tracer import tracer
 from .model_config import get_model
 
 
-async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
+async def process_signal_evaluations(evaluations: list = None, **kwargs) -> str:
     """
     Commits analysis of emergency signals. 
     """
@@ -24,14 +24,13 @@ async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
     results = []
     processed_signal_ids = set()
 
-    # ULTIMATE UNWRAP: Handle payload dict or kwargs
-    if payload is None:
-        payload = kwargs
-    elif isinstance(payload, str):
-        try: payload = json.loads(payload)
-        except: payload = {}
+    if evaluations is None and "evaluations" in kwargs:
+        evaluations = kwargs["evaluations"]
+    elif isinstance(evaluations, str):
+        try: evaluations = json.loads(evaluations).get("evaluations", [])
+        except: evaluations = []
 
-    data_list = payload.get("evaluations", [])
+    data_list = evaluations
     if isinstance(data_list, dict) and "evaluations" in data_list:
         data_list = data_list["evaluations"]
     
@@ -112,26 +111,24 @@ signal_collector_agent = Agent(
 
     REQUIRED JSON FORMAT:
     {
-      "payload": {
-        "evaluations": [
-          {
-            "signal_id": "SIGNAL_ID_HERE",
-            "status": "verified",
-            "credibility": 0.85,
-            "incident_id": "EXISTING_INCIDENT_ID_OR_NULL",
-            "new_incident_data": {
-              "type": "accident",
-              "severity": "HIGH",
-              "location_name": "Karachi"
-            }
+      "evaluations": [
+        {
+          "signal_id": "SIGNAL_ID_HERE",
+          "status": "verified",
+          "credibility": 0.85,
+          "incident_id": "EXISTING_INCIDENT_ID_OR_NULL",
+          "new_incident_data": {
+            "type": "accident",
+            "severity": "HIGH",
+            "location_name": "Karachi"
           }
-        ]
-      }
+        }
+      ]
     }
 
     STRICT RULES:
     1. Call the process_signal_evaluations tool.
-    2. Pass the 'payload' parameter as an object exactly matching the format above.
+    2. Pass the 'evaluations' parameter as a list of objects exactly matching the format above.
     3. Use JSON 'null' for missing values. NEVER use Python 'None'.
     4. Stop after calling the tool.
     """
