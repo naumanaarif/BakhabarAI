@@ -163,4 +163,16 @@ async def run_crisis_simulation(scenario_data: dict = None):
         tracer.log("System", "Degraded Mode: Impact Simulation failed.", {"error": str(e)}, {}, 0.0)
         print(f"CRITICAL: Impact Simulation Failure: {e}")
 
+    # 5. Final Reporting Stage
+    try:
+        from agents.reporter import reporter_agent
+        active_incidents = query_active_incidents()
+        if active_incidents:
+            print("DEBUG: Running ReporterAgent...")
+            prompt = f"Generate a final summary report for these active incidents:\n{json.dumps(sanitize(active_incidents), default=str)}"
+            await run_agent_standalone(reporter_agent, prompt)
+    except Exception as e:
+        tracer.log("System", "Degraded Mode: Final Reporting failed.", {"error": str(e)}, {}, 0.0)
+        print(f"CRITICAL: Final Reporting Failure: {e}")
+
     return "PIPELINE_COMPLETE"

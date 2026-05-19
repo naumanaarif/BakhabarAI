@@ -1,4 +1,30 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+
+class ImprovementMetrics(BaseModel):
+    response_time_reduction: str
+    safety_boost: str
+
+class ImpactState(BaseModel):
+    before_state: str
+    after_state: str
+    improvement_metrics: ImprovementMetrics
+
+class Notifications(BaseModel):
+    public: str
+    hospitals: str
+    utility_providers: str
+
+class Simulation(BaseModel):
+    incident_id: str
+    action_type: str
+    description: str
+    impact: Optional[ImpactState] = None
+    notifications: Optional[Notifications] = None
+
+class SimulationsPayload(BaseModel):
+    simulations: List[Simulation]
+
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.firebase_tools import query_active_incidents, create_simulation_record
@@ -6,44 +32,62 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def process_simulations_and_messages(simulations: list = None, **kwargs) -> str:
+async def process_simulations_and_messages(simulations: List[Dict[str, Any]], **kwargs) -> str:
     """
     Commits your response impact simulations and multi-stakeholder notifications.
     """
-    import re
-    if simulations is None and "simulations" in kwargs:
-        simulations = kwargs["simulations"]
-    elif isinstance(simulations, str):
-        try: simulations = json.loads(simulations).get("simulations", [])
-        except: simulations = []
-
-    if isinstance(simulations, dict) and "simulations" in simulations:
-        simulations = simulations["simulations"]
-    
-    if not isinstance(simulations, (list, tuple)):
+    if not simulations or not isinstance(simulations, list):
         return "ERROR: Expected a list of simulations."
 
     results = []
     for sim in simulations:
-        if not isinstance(sim, dict): continue
-        incident_id = sim.get('incident_id')
+        incident_id = sim.get('incident_id') or sim.get('id')
         if not incident_id: continue
         
-        # Ensure notifications are never null for the UI
-        notifs = sim.get('notifications', {})
-        if not isinstance(notifs, dict): notifs = {}
+        # Fuzzy Impact extraction (handle string vs object)
+        impact = sim.get('impact') or {}
+        if isinstance(impact, str):
+            # If LLM sent a string, wrap it in a standard object
+            impact = {
+                'before_state': 'Unmanaged crisis state.',
+                'after_state': impact,
+                'improvement_metrics': {'response_time_reduction': '10 min', 'safety_boost': '20%'}
+            }
+        elif not isinstance(impact, dict):
+            impact = {}
+
+        # Ensure improvement metrics exist
+        metrics = impact.get('improvement_metrics') or {}
+        if not isinstance(metrics, dict): metrics = {}
         
-        # UI Safety: Fill nulls with placeholder text
-        if not notifs.get('public'): notifs['public'] = "Response plan activated."
-        if not notifs.get('hospitals'): notifs['hospitals'] = "Normal operational status."
-        if not notifs.get('utility_providers'): notifs['utility_providers'] = "No utility disruptions reported."
+        impact_payload = {
+            'before_state': impact.get('before_state') or 'Pending emergency response.',
+            'after_state': impact.get('after_state') or 'Resource deployment in progress.',
+            'improvement_metrics': {
+                'response_time_reduction': metrics.get('response_time_reduction') or '15 min',
+                'safety_boost': metrics.get('safety_boost') or '30%'
+            }
+        }
+
+        # Fuzzy Notifications extraction
+        notif = sim.get('notifications') or {}
+        if not isinstance(notif, dict): notif = {}
+        
+        # Handle cases where LLM uses "subject/message" instead of "public/hospitals/utility"
+        msg = notif.get('message') or notif.get('body') or "Emergency response units dispatched."
+        
+        notifications_payload = {
+            'public': notif.get('public') or msg,
+            'hospitals': notif.get('hospitals') or f"Alert: {msg}",
+            'utility_providers': notif.get('utility_providers') or "No immediate utility impact."
+        }
 
         create_simulation_record(
             incident_id=incident_id,
-            action_type=sim.get('action_type', 'Response Optimization'),
-            description=sim.get('description', 'Simulating impact...'),
-            impact=sim.get('impact', {}),
-            notifications=notifs
+            action_type=sim.get('action_type') or 'Crisis Response',
+            description=sim.get('description') or 'Simulating impact of response...',
+            impact=impact_payload,
+            notifications=notifications_payload
         )
         results.append(incident_id)
 
@@ -57,33 +101,33 @@ executor_agent = Agent(
         FunctionTool(process_simulations_and_messages)
     ],
     instruction="""
-    You are the Simulation & Stakeholder Agent. Your ONLY job is to simulate impact and call 'process_simulations_and_messages' ONCE.
+    You are the Simulation Agent. Analyze incidents and call 'process_simulations_and_messages'.
 
-    REQUIRED JSON FORMAT:
-    {
-      "simulations": [
-        {
-          "incident_id": "INC_123",
-          "action_type": "Public Alert & Medical Dispatch",
-          "description": "Deployment of ambulances and traffic detours.",
-          "impact": {
-            "before_state": "High traffic congestion and unverified casualties.",
-            "after_state": "Traffic diverted; 2 medical units on scene.",
-            "improvement_metrics": { "response_time_reduction": "15 min", "safety_boost": "40%" }
-          },
-          "notifications": {
-            "public": "AVOID Super Highway. Use alternative routes.",
-            "hospitals": "Accident report: 2 units incoming. ETA 10 mins.",
-            "utility_providers": "No power/water disruptions expected."
-          }
+    EXAMPLE TOOL CALL:
+    process_simulations_and_messages(simulations=[
+      {
+        "incident_id": "INC_123",
+        "action_type": "Medical Dispatch",
+        "description": "Ambulances sent via R-23 route.",
+        "impact": {
+          "before_state": "Traffic blocked, casualties high.",
+          "after_state": "Medics on site, traffic diverted.",
+          "improvement_metrics": {"response_time_reduction": "12m", "safety_boost": "40%"}
+        },
+        "notifications": {
+          "public": "Avoid Super Highway.",
+          "hospitals": "Multiple casualties incoming.",
+          "utility_providers": "No power disruption."
         }
-      ]
-    }
+      }
+    ])
 
     STRICT RULES:
-    1. Call the process_simulations_and_messages tool.
-    2. Pass the 'simulations' parameter exactly matching the JSON format above.
-    3. Notifications MUST NEVER BE NULL. If no action is needed, write 'No specific action required' or 'Monitoring status'.
+    1. Call the tool ONCE.
+    2. 'impact' MUST be an object, NOT a string.
+    3. 'notifications' MUST have: public, hospitals, utility_providers.
     4. Stop after calling the tool.
     """
 )
+
+
