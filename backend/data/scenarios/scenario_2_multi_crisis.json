@@ -1,88 +1,17 @@
 {
   "scenario_id": "multi_001",
-  "name": "Simultaneous Heatwave + Road Accident Mass Casualty",
-  "description": "Extreme heatwave gripping Orangi Town causes heat stroke mass casualties at a public hospital, while simultaneously a multi-vehicle pileup on the M-9 Motorway blocks emergency access routes — forcing resource trade-offs between two active crises.",
-  "city": "Karachi",
+  "name": "Simultaneous Flood and Heatwave",
+  "description": "Flash flood in G-10 while I-8 suffers from an extreme heatwave.",
   "initial_signals": [
     {
       "signal_id": "weather_heat_001",
       "source_type": "weather",
       "source_name": "Google Weather API",
-      "timestamp": "2025-06-20T11:00:00Z",
-      "location": { "name": "Orangi Town, Karachi", "lat": 24.9480, "lng": 66.9950 },
-      "content": "Extreme heat warning: Temperature 47°C recorded at Orangi Town station. Heat index at 52°C. Third consecutive day above 44°C. Risk of mass heat stroke for outdoor populations.",
+      "timestamp": "2024-01-15T10:00:00Z",
+      "location": { "name": "I-8, Islamabad", "lat": 33.6682, "lng": 73.0768 },
+      "content": "Temperature rising to 45C. Heatwave warning issued.",
       "credibility_score": 1.0,
       "is_mock": false
-    },
-    {
-      "signal_id": "social_heat_001",
-      "source_type": "social",
-      "source_name": "WhatsApp Report",
-      "timestamp": "2025-06-20T11:20:00Z",
-      "location": { "name": "Orangi Town, Karachi", "lat": 24.9500, "lng": 66.9970 },
-      "content": "Orangi Town mein aaj garmi se 7 log behosh hogaye hain. Abbas Town ke paas ek budha mara bhi. Hospital mein jagah nahi. #Karachi #LU",
-      "credibility_score": 0.72,
-      "is_mock": true
-    },
-    {
-      "signal_id": "ec_heat_001",
-      "source_type": "emergency_call",
-      "source_name": "Edhi Foundation Dispatch",
-      "timestamp": "2025-06-20T11:35:00Z",
-      "location": { "name": "Orangi Town Sector 11-C, Karachi", "lat": 24.9510, "lng": 66.9980 },
-      "content": "Mass heat stroke emergency — multiple collapses at Pakistan Chowk and Qasba Colony. Edhi dispatching 3 ambulances. JPMC and Civil Hospital informed. 20+ potential victims.",
-      "credibility_score": 0.95,
-      "is_mock": true
-    },
-    {
-      "signal_id": "sensor_heat_001",
-      "source_type": "sensor",
-      "source_name": "Air Quality Sensor AQ-Orangi-02",
-      "timestamp": "2025-06-20T11:00:00Z",
-      "location": { "name": "Orangi Town, Karachi", "lat": 24.9480, "lng": 66.9950 },
-      "content": "Temperature: 47.2°C | Humidity: 22% | Heat Index: 52.1°C | UV Index: 11 (Extreme) | AQI: 178 (Unhealthy). Dangerous outdoor conditions.",
-      "credibility_score": 1.0,
-      "is_mock": true
-    },
-    {
-      "signal_id": "social_accident_001",
-      "source_type": "social",
-      "source_name": "X (Twitter)",
-      "timestamp": "2025-06-20T11:45:00Z",
-      "location": { "name": "M-9 Motorway, Karachi", "lat": 24.8900, "lng": 67.2700 },
-      "content": "BREAKING: Massive pile-up on M-9 Motorway near Toll Plaza — at least 3 trucks and 6 cars involved. Road completely blocked both directions. Multiple injured. #KarachiAccident #M9",
-      "credibility_score": 0.78,
-      "is_mock": true
-    },
-    {
-      "signal_id": "ec_accident_001",
-      "source_type": "emergency_call",
-      "source_name": "1122 Rescue Dispatch",
-      "timestamp": "2025-06-20T11:50:00Z",
-      "location": { "name": "M-9 Motorway Toll Plaza, Karachi", "lat": 24.8910, "lng": 67.2710 },
-      "content": "Caller reports tanker overturned on M-9. Fuel spill. At least 12 injured, 2 critical. Fire risk present. Emergency services need to be rerouted — M-9 completely sealed.",
-      "credibility_score": 0.97,
-      "is_mock": true
-    },
-    {
-      "signal_id": "fr_accident_001",
-      "source_type": "field_report",
-      "source_name": "Motorway Police Unit MP-09",
-      "timestamp": "2025-06-20T12:05:00Z",
-      "location": { "name": "M-9 Motorway KM-32, Karachi", "lat": 24.8915, "lng": 67.2720 },
-      "content": "Confirmed: 9-vehicle pileup. 1 oil tanker overturned. Fuel spill 200m radius. 14 casualties, 3 critical. M-9 closed indefinitely. Alternative route via Super Highway activated. Fire brigade needed.",
-      "credibility_score": 0.99,
-      "is_mock": true
     }
-  ],
-  "resource_conflict": {
-    "description": "Only 4 ambulances available citywide. Heatwave needs 3 for mass casualty transport. Accident needs 3 for critical trauma. System must allocate 3 to accident (life-threatening trauma) and coordinate with Edhi Foundation for heatwave response.",
-    "trade_off_explanation": "Motorway accident victims have higher immediate mortality risk (trauma + fuel fire). Heatwave victims have Edhi Foundation coverage. Optimal allocation: 3 city ambulances → M-9, 2 Edhi units → Orangi Town."
-  },
-  "expected_output": {
-    "crisis_1": { "type": "heatwave", "severity": "HIGH", "location": "Orangi Town" },
-    "crisis_2": { "type": "accident", "severity": "HIGH", "location": "M-9 Motorway" },
-    "confidence_min": 0.85,
-    "total_affected_population_approx": 125000
-  }
+  ]
 }
