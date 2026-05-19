@@ -1,4 +1,22 @@
 import json
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class NewIncidentData(BaseModel):
+    type: str = Field(description="Type of the incident (e.g. accident, flood)")
+    severity: str = Field(description="Severity (LOW, MEDIUM, HIGH)")
+    location_name: str = Field(description="Name of the location")
+
+class SignalEvaluation(BaseModel):
+    signal_id: str
+    status: str
+    credibility: float
+    incident_id: Optional[str] = None
+    new_incident_data: Optional[NewIncidentData] = None
+
+class EvaluationsPayload(BaseModel):
+    evaluations: List[SignalEvaluation]
+
 from typing import List, Dict, Any
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
@@ -13,7 +31,7 @@ from tracer import tracer
 from .model_config import get_model
 
 
-async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
+async def process_signal_evaluations(evaluations: List[SignalEvaluation], **kwargs) -> str:
     """
     Commits analysis of emergency signals. 
     """
@@ -24,37 +42,39 @@ async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
     results = []
     processed_signal_ids = set()
 
-    # ULTIMATE UNWRAP: Handle payload dict or kwargs
-    if payload is None:
-        payload = kwargs
-    elif isinstance(payload, str):
-        try: payload = json.loads(payload)
-        except: payload = {}
-
-    data_list = payload.get("evaluations", [])
-    if isinstance(data_list, dict) and "evaluations" in data_list:
-        data_list = data_list["evaluations"]
+    # Robust handling for different input formats (Pydantic models or raw dicts)
+    data_list = evaluations if isinstance(evaluations, (list, tuple)) else []
     
-    if not isinstance(data_list, (list, tuple)):
-        return "ERROR: Expected a list of evaluations."
-
     for ev in data_list:
-        if not isinstance(ev, dict): continue
-        signal_id = ev.get('signal_id') or ev.get('id')
+        signal_id = None
+        incident_id = None
+        status = 'noise'
+        credibility = 0.5
+        new_data = None
+        
+        if hasattr(ev, 'signal_id'):
+            signal_id = ev.signal_id
+            incident_id = getattr(ev, 'incident_id', None)
+            status = getattr(ev, 'status', 'noise')
+            credibility = float(getattr(ev, 'credibility', 0.5))
+            new_data = getattr(ev, 'new_incident_data', None)
+        elif isinstance(ev, dict):
+            signal_id = ev.get('signal_id')
+            incident_id = ev.get('incident_id')
+            status = ev.get('status', 'noise')
+            credibility = float(ev.get('credibility', 0.5))
+            new_data = ev.get('new_incident_data')
+
         if not signal_id or signal_id in processed_signal_ids:
             continue
-            
         processed_signal_ids.add(signal_id)
-        incident_id = ev.get('incident_id')
-        status = ev.get('status', 'noise')
-        credibility = float(ev.get('credibility', 0.5))
         
         print(f"DEBUG: Processing evaluation for signal {signal_id} with status {status}")
         
         # If signal is verified
         if status == 'verified':
             # 1. CONFIDENCE BOOST: If incident exists, increment confidence
-            if incident_id and incident_id != "null":
+            if incident_id and incident_id != "null" and incident_id != "None":
                 print(f"DEBUG: Boosting confidence for existing incident {incident_id}")
                 inc_ref = db.collection("incidents").document(incident_id)
                 inc_doc = inc_ref.get()
@@ -67,8 +87,7 @@ async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
             
             # 2. CREATE NEW: If no incident_id, create new one
             else:
-                inc_data = ev.get('new_incident_data')
-                if not inc_data or not isinstance(inc_data, dict): 
+                if not new_data: 
                     # Attempt recovery
                     signal = FirebaseService.get_signal_by_id(signal_id)
                     source = signal.get("source_type", "social") if signal else "social"
@@ -84,14 +103,26 @@ async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
                         signal_source=source
                     )
                 else:
+                    # Robust extraction from new_data
+                    if hasattr(new_data, 'type'):
+                        inc_type = new_data.type
+                        inc_sev = new_data.severity
+                        inc_loc = new_data.location_name
+                    elif isinstance(new_data, dict):
+                        inc_type = new_data.get('type', 'emergency')
+                        inc_sev = new_data.get('severity', 'MEDIUM')
+                        inc_loc = new_data.get('location_name', 'Unknown')
+                    else:
+                        inc_type, inc_sev, inc_loc = 'emergency', 'MEDIUM', 'Unknown'
+                    
                     incident_id = create_incident(
-                        incident_type=inc_data.get('type', 'emergency'),
-                        severity=inc_data.get('severity', 'MEDIUM'),
+                        incident_type=inc_type,
+                        severity=inc_sev,
                         confidence=credibility,
-                        location_name=inc_data.get('location_name', 'Unknown'),
-                        lat=inc_data.get('lat', 33.6844),
-                        lng=inc_data.get('lng', 73.0479),
-                        signal_source=inc_data.get('source_type', 'Citizen Report')
+                        location_name=inc_loc,
+                        lat=33.6844,
+                        lng=73.0479,
+                        signal_source="Citizen Report"
                     )
                 print(f"DEBUG: Created NEW incident {incident_id} for signal {signal_id}")
         
@@ -110,29 +141,12 @@ signal_collector_agent = Agent(
     instruction="""
     You are the Signal Fusion Agent. Your ONLY job is to analyze 'pending_signals' and call 'process_signal_evaluations' ONCE.
 
-    REQUIRED JSON FORMAT:
-    {
-      "payload": {
-        "evaluations": [
-          {
-            "signal_id": "SIGNAL_ID_HERE",
-            "status": "verified",
-            "credibility": 0.85,
-            "incident_id": "EXISTING_INCIDENT_ID_OR_NULL",
-            "new_incident_data": {
-              "type": "accident",
-              "severity": "HIGH",
-              "location_name": "Karachi"
-            }
-          }
-        ]
-      }
-    }
-
     STRICT RULES:
-    1. Call the process_signal_evaluations tool.
-    2. Pass the 'payload' parameter as an object exactly matching the format above.
-    3. Use JSON 'null' for missing values. NEVER use Python 'None'.
-    4. Stop after calling the tool.
+    1. Call the process_signal_evaluations tool with an 'evaluations' list.
+    2. Each evaluation MUST have: signal_id, status (verified/noise), and credibility (0.0 to 1.0).
+    3. If status is 'verified' and there is no existing incident_id, you MUST provide 'new_incident_data'.
+    4. Use JSON 'null' for missing values. NEVER use Python 'None'.
+    5. Stop after calling the tool.
     """
 )
+

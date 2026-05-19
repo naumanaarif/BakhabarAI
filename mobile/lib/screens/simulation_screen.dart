@@ -17,8 +17,27 @@ class _SimulationScreenState extends State<SimulationScreen> {
   final ApiService _apiService = ApiService();
   late Stream<List<ActionSimulation>> _simulationsStream;
   late Stream<List<Incident>> _incidentsStream;
-  
+
   String _selectedCategory = 'ALL';
+
+  String _getMonthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    if (month >= 1 && month <= 12) return months[month - 1];
+    return '';
+  }
 
   @override
   void initState() {
@@ -71,14 +90,52 @@ class _SimulationScreenState extends State<SimulationScreen> {
             stream: _simulationsStream,
             builder: (context, simSnapshot) {
               if (simSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                );
               }
 
               final simulations = simSnapshot.data ?? [];
               final incidents = incSnapshot.data ?? [];
 
+              // Sort simulations by timestamp descending (newest first)
+              simulations.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+              // Compute the latest simulation for each incident
+              final latestSimIds = <String>{};
+              final incidentSeen = <String>{};
+              for (var sim in simulations) {
+                if (!incidentSeen.contains(sim.incidentId)) {
+                  incidentSeen.add(sim.incidentId);
+                  latestSimIds.add(sim.id);
+                }
+              }
+
               // Dynamically extract types from active simulations
-              final activeTypes = simulations.map((sim) {
+              final activeTypes = simulations
+                  .map((sim) {
+                    final incident = incidents.firstWhere(
+                      (inc) => inc.id == sim.incidentId,
+                      orElse: () => Incident(
+                        id: 'unknown',
+                        type: 'Alert',
+                        location: Location(name: 'Unknown', lat: 0, lng: 0),
+                        severity: 'LOW',
+                        confidence: 0,
+                        affectedPopulation: 0,
+                        status: '',
+                      ),
+                    );
+                    return incident.type.toUpperCase();
+                  })
+                  .toSet()
+                  .toList();
+
+              activeTypes.sort();
+              activeTypes.insert(0, 'ALL');
+
+              final filteredSims = simulations.where((sim) {
+                if (_selectedCategory == 'ALL') return true;
                 final incident = incidents.firstWhere(
                   (inc) => inc.id == sim.incidentId,
                   orElse: () => Incident(
@@ -90,26 +147,6 @@ class _SimulationScreenState extends State<SimulationScreen> {
                     affectedPopulation: 0,
                     status: '',
                   ),
-                );
-                return incident.type.toUpperCase();
-              }).toSet().toList();
-              
-              activeTypes.sort();
-              activeTypes.insert(0, 'ALL');
-
-              final filteredSims = simulations.where((sim) {
-                if (_selectedCategory == 'ALL') return true;
-                final incident = incidents.firstWhere(
-                  (inc) => inc.id == sim.incidentId, 
-                  orElse: () => Incident(
-                    id: 'unknown', 
-                    type: 'Alert', 
-                    location: Location(name: 'Unknown', lat: 0, lng: 0), 
-                    severity: 'LOW', 
-                    confidence: 0, 
-                    affectedPopulation: 0, 
-                    status: ''
-                  )
                 );
                 return incident.type.toUpperCase() == _selectedCategory;
               }).toList();
@@ -134,7 +171,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: activeTypes.map((type) => _buildTabPill(type)).toList(),
+                          children: activeTypes
+                              .map((type) => _buildTabPill(type))
+                              .toList(),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -145,15 +184,84 @@ class _SimulationScreenState extends State<SimulationScreen> {
                           child: Center(
                             child: Column(
                               children: [
-                                const Icon(LucideIcons.barChart2, size: 48, color: AppColors.textMuted),
+                                const Icon(
+                                  LucideIcons.barChart2,
+                                  size: 48,
+                                  color: AppColors.textMuted,
+                                ),
                                 const SizedBox(height: 16),
-                                Text('No active simulations for $_selectedCategory', style: AppTextStyles.bodyMuted),
+                                Text(
+                                  'No active simulations for $_selectedCategory',
+                                  style: AppTextStyles.bodyMuted,
+                                ),
                               ],
                             ),
                           ),
                         )
                       else
-                        ...filteredSims.map((sim) => _buildSimulationBody(sim)).toList(),
+                        ...filteredSims.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final sim = entry.value;
+                          final incident = incidents.firstWhere(
+                            (inc) => inc.id == sim.incidentId,
+                            orElse: () => Incident(
+                              id: 'unknown',
+                              type: 'Alert',
+                              location: Location(
+                                name: 'Unknown',
+                                lat: 0,
+                                lng: 0,
+                              ),
+                              severity: 'LOW',
+                              confidence: 0,
+                              affectedPopulation: 0,
+                              status: '',
+                            ),
+                          );
+                          final isLatest = latestSimIds.contains(sim.id);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSimulationBody(sim, isLatest, incident),
+                              if (idx < filteredSims.length - 1)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 24,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Divider(
+                                          color: Colors.grey.shade400,
+                                          thickness: 1,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        ),
+                                        child: Text(
+                                          'NEXT SIMULATION',
+                                          style: AppTextStyles.label.copyWith(
+                                            color: AppColors.textMuted,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Divider(
+                                          color: Colors.grey.shade400,
+                                          thickness: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          );
+                        }).toList(),
 
                       const SizedBox(height: 40),
                     ],
@@ -167,15 +275,163 @@ class _SimulationScreenState extends State<SimulationScreen> {
     );
   }
 
-  Widget _buildSimulationBody(ActionSimulation sim) {
+  Widget _buildSimulationBody(
+    ActionSimulation sim,
+    bool isLatest,
+    Incident incident,
+  ) {
     final impact = sim.impactPrediction;
-    final beforeState = impact['before_state'] ?? 'Baseline: High impact without intervention';
-    final afterState = impact['after_state'] ?? 'Predicted Result: Managed impact and restored flow';
+    final beforeState =
+        impact['before_state'] ?? 'Baseline: High impact without intervention';
+    final afterState =
+        impact['after_state'] ??
+        'Predicted Result: Managed impact and restored flow';
     final improvement = impact['improvement_metrics'] ?? {};
+
+    IconData getCrisisIcon(String type) {
+      switch (type.toLowerCase()) {
+        case 'flood':
+          return LucideIcons.waves;
+        case 'heatwave':
+          return LucideIcons.thermometerSun;
+        case 'accident':
+          return LucideIcons.car;
+        case 'power outage':
+        case 'power_outage':
+          return LucideIcons.zap;
+        case 'protest':
+          return LucideIcons.megaphone;
+        case 'disease':
+          return LucideIcons.activity;
+        default:
+          return LucideIcons.alertTriangle;
+      }
+    }
+
+    final timeStr =
+        "${sim.timestamp.day} ${_getMonthName(sim.timestamp.month)} ${sim.timestamp.hour.toString().padLeft(2, '0')}:${sim.timestamp.minute.toString().padLeft(2, '0')}";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Incident details header card
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isLatest
+                      ? AppColors.accent.withOpacity(0.1)
+                      : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  getCrisisIcon(incident.type),
+                  color: isLatest ? AppColors.accent : AppColors.textMuted,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          incident.type.toUpperCase(),
+                          style: AppTextStyles.h2.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isLatest
+                                ? AppColors.successGreen
+                                : Colors.grey.shade400,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isLatest ? 'LATEST' : 'PREVIOUS',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.mapPin,
+                          size: 12,
+                          color: AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            incident.location.name,
+                            style: AppTextStyles.bodyMuted.copyWith(
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    timeStr,
+                    style: AppTextStyles.label.copyWith(
+                      fontSize: 10,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sim ID: ${sim.id.substring(0, 5)}',
+                    style: AppTextStyles.label.copyWith(
+                      fontSize: 9,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
         // Before Intervention Card
         Card(
           color: Colors.white,
@@ -188,10 +444,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: const Border(
-                left: BorderSide(
-                  color: AppColors.dangerRed,
-                  width: 4,
-                ),
+                left: BorderSide(color: AppColors.dangerRed, width: 4),
               ),
             ),
             padding: const EdgeInsets.all(16),
@@ -216,15 +469,20 @@ class _SimulationScreenState extends State<SimulationScreen> {
             ),
           ),
         ),
-        
+
         // Divider / AI Actions Taken
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: Row(
             children: [
-              Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+              Expanded(
+                child: Divider(color: Colors.grey.shade300, thickness: 1),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(12),
@@ -232,7 +490,11 @@ class _SimulationScreenState extends State<SimulationScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.cpu, color: AppColors.textMuted, size: 16),
+                    const Icon(
+                      LucideIcons.cpu,
+                      color: AppColors.textMuted,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'AI ACTIONS TAKEN',
@@ -246,7 +508,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   ],
                 ),
               ),
-              Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+              Expanded(
+                child: Divider(color: Colors.grey.shade300, thickness: 1),
+              ),
             ],
           ),
         ),
@@ -266,22 +530,46 @@ class _SimulationScreenState extends State<SimulationScreen> {
               children: [
                 _buildActionItem(LucideIcons.gitCommit, sim.actionType),
                 const SizedBox(height: 8),
-                Text(sim.description, style: AppTextStyles.bodyMuted.copyWith(fontSize: 13)),
+                Text(
+                  sim.description,
+                  style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
+                ),
                 if (sim.stakeholderNotifications.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text('Notifications Generated:', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 11)),
-                  const SizedBox(height: 8),
-                  ...sim.stakeholderNotifications.entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(LucideIcons.send, size: 12, color: AppColors.accent),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text('${e.key.toUpperCase()}: ${e.value}', style: AppTextStyles.body.copyWith(fontSize: 11))),
-                      ],
+                  Text(
+                    'Notifications Generated:',
+                    style: AppTextStyles.label.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
                     ),
-                  )).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  ...sim.stakeholderNotifications.entries
+                      .map(
+                        (e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                LucideIcons.send,
+                                size: 12,
+                                color: AppColors.accent,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${e.key.toUpperCase()}: ${e.value}',
+                                  style: AppTextStyles.body.copyWith(
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ],
               ],
             ),
@@ -301,10 +589,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: const Border(
-                left: BorderSide(
-                  color: AppColors.successGreen,
-                  width: 4,
-                ),
+                left: BorderSide(color: AppColors.successGreen, width: 4),
               ),
             ),
             padding: const EdgeInsets.all(16),
@@ -328,14 +613,23 @@ class _SimulationScreenState extends State<SimulationScreen> {
                 ),
                 if (improvement.isNotEmpty) ...[
                   const Divider(height: 24),
-                  Text('Metrics Improvement:', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 11)),
+                  Text(
+                    'Metrics Improvement:',
+                    style: AppTextStyles.label.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
                     runSpacing: 8,
                     children: improvement.entries.map<Widget>((e) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.successGreen.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -343,72 +637,25 @@ class _SimulationScreenState extends State<SimulationScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(LucideIcons.trendingDown, size: 14, color: AppColors.successGreen),
+                            const Icon(
+                              LucideIcons.trendingDown,
+                              size: 14,
+                              color: AppColors.successGreen,
+                            ),
                             const SizedBox(width: 4),
-                            Text('${e.key}: ${e.value}', style: AppTextStyles.label.copyWith(fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text(
+                              '${e.key}: ${e.value}',
+                              style: AppTextStyles.label.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       );
                     }).toList(),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Decision Matrix / View Logs
-        Card(
-          color: AppColors.primary.withOpacity(0.3),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.grey.shade300),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Icon(LucideIcons.cpu, size: 36, color: AppColors.textMuted),
-                const SizedBox(height: 12),
-                Text(
-                  'Decision Matrix',
-                  style: AppTextStyles.h2.copyWith(fontSize: 16),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Review the step-by-step logic and environmental parameters the AI evaluated.',
-                  style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const AgentLogsScreen(),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.accent, width: 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      'View Agent Logs',
-                      style: AppTextStyles.body.copyWith(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -433,10 +680,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
           color: isSelected ? AppColors.accent : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 6,
-            )
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
           ],
         ),
         child: Text(
