@@ -20,6 +20,12 @@ async def run_crisis_simulation(scenario_data: dict = None):
     from google.cloud.firestore_v1 import GeoPoint
     import json
     import asyncio
+    import sys
+
+    def fp(*args):
+        """flush_print — guaranteed immediate output in uvicorn console."""
+        print(*args, flush=True)
+        sys.stdout.flush()
 
     trigger_type = (scenario_data or {}).get("trigger_type", "manual")
 
@@ -74,16 +80,16 @@ async def run_crisis_simulation(scenario_data: dict = None):
         output_data={},
         confidence=1.0,
     )
-    print("\n" + "="*60)
-    print(f"🚀 [PIPELINE] Starting | trigger: {trigger_type}")
-    print("="*60)
+    fp("\n" + "="*60)
+    fp(f"[PIPELINE] Starting | trigger: {trigger_type}")
+    fp("="*60)
 
     # ══════════════════════════════════════════════════════════════════════════
     # STAGE 1 — Signal Fusion
     # ══════════════════════════════════════════════════════════════════════════
-    print("\n" + "-"*60)
-    print("[STAGE 1] Signal Fusion")
-    print("-"*60)
+    fp("\n" + "-"*60)
+    fp("[STAGE 1] Signal Fusion")
+    fp("-"*60)
     tracer.log("SignalFusionAgent", "Stage 1: Signal Fusion starting…", {}, {}, 1.0)
     if trigger_type == "manual":
         target_id = (scenario_data or {}).get("target_signal_id")
@@ -141,9 +147,9 @@ async def run_crisis_simulation(scenario_data: dict = None):
     # ══════════════════════════════════════════════════════════════════════════
     # STAGE 2 — Crisis Detection
     # ══════════════════════════════════════════════════════════════════════════
-    print("\n" + "-"*60)
-    print("[STAGE 2] Crisis Detection")
-    print("-"*60)
+    fp("\n" + "-"*60)
+    fp("[STAGE 2] Crisis Detection")
+    fp("-"*60)
     tracer.log("DetectorAgent", "Stage 2: Crisis Detection starting…", {}, {}, 1.0)
     await asyncio.sleep(3)  # Inter-stage pause
     if trigger_type != "manual":
@@ -177,9 +183,9 @@ async def run_crisis_simulation(scenario_data: dict = None):
     # ══════════════════════════════════════════════════════════════════════════
     # STAGE 3 — Resource Planning
     # ══════════════════════════════════════════════════════════════════════════
-    print("\n" + "-"*60)
-    print("[STAGE 3] Resource Planning")
-    print("-"*60)
+    fp("\n" + "-"*60)
+    fp("[STAGE 3] Resource Planning")
+    fp("-"*60)
     tracer.log("ResourcePlannerAgent", "Stage 3: Resource Planning starting…", {}, {}, 1.0)
     await asyncio.sleep(3)  # Inter-stage pause
     try:
@@ -215,9 +221,9 @@ async def run_crisis_simulation(scenario_data: dict = None):
     # ══════════════════════════════════════════════════════════════════════════
     # STAGE 4 — Impact Simulation
     # ══════════════════════════════════════════════════════════════════════════
-    print("\n" + "-"*60)
-    print("[STAGE 4] Impact Simulation")
-    print("-"*60)
+    fp("\n" + "-"*60)
+    fp("[STAGE 4] Impact Simulation")
+    fp("-"*60)
     tracer.log("SimulationStakeholderAgent", "Stage 4: Impact Simulation starting…", {}, {}, 1.0)
     await asyncio.sleep(3)  # Inter-stage pause
     try:
@@ -289,7 +295,7 @@ async def run_crisis_simulation(scenario_data: dict = None):
         tracer.log("System", f"⚠ Final Reporting failed: {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
         print(f"[STAGE 5] FAILED: {e}")
 
-    print("\n" + "="*60)
-    print("[PIPELINE] ✅ Complete!")
-    print("="*60 + "\n")
+    fp("\n" + "="*60)
+    fp("[PIPELINE] Complete!")
+    fp("="*60 + "\n")
     return "PIPELINE_COMPLETE"

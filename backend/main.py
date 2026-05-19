@@ -1,8 +1,14 @@
 import sys
-import io
+import os
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+# Force unbuffered output so print() is immediately visible in uvicorn console
+os.environ["PYTHONUNBUFFERED"] = "1"
+import builtins
+_orig_print = builtins.print
+def _print_flush(*args, **kwargs):
+    kwargs.setdefault("flush", True)
+    _orig_print(*args, **kwargs)
+builtins.print = _print_flush
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,14 +39,22 @@ async def root():
 
 @app.on_event("startup")
 async def startup_event():
-    print("\n" + "="*60)
-    print("🚀 BakhabarAI Backend Started")
-    print("   ► GET  /api/incidents        — active incidents")
-    print("   ► POST /api/run-scenario     — trigger agent pipeline")
-    print("   ► GET  /api/logs             — agent trace logs")
-    print("   ► GET  /api/debug/ping       — health check")
-    print("   ► DEL  /api/debug/logs       — clear in-memory logs")
-    print("="*60 + "\n")
+    import sys
+    banner = [
+        "",
+        "="*60,
+        "\U0001f680 BakhabarAI Backend Started",
+        "   \u25ba GET  /api/incidents        -- active incidents",
+        "   \u25ba POST /api/run-scenario     -- trigger agent pipeline",
+        "   \u25ba GET  /api/logs             -- agent trace logs",
+        "   \u25ba GET  /api/debug/ping       -- health check",
+        "   \u25ba DEL  /api/debug/logs       -- clear in-memory logs",
+        "="*60,
+        "",
+    ]
+    for line in banner:
+        print(line, flush=True)
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     import uvicorn

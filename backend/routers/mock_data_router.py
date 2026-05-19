@@ -134,39 +134,92 @@ async def submit_report(report: dict):
 async def run_scenario(scenario: dict = None):
     """
     Triggers the agent pipeline for a stress test scenario.
-    Ensures it only processes mock/scenario data.
+    Seeds mock Islamabad incidents directly into Firestore so all pipeline
+    stages have real data to process.
     """
-    print(f"🚀 [BACKEND] Received request to run scenario: {scenario}")
+    from tools.firebase_tools import create_incident, query_active_incidents
+    import json
+
+    print("="*60)
+    print("[SCENARIO] /api/run-scenario called")
+    print(f"[SCENARIO] Payload: {json.dumps(scenario or {})[:200]}")
+    print("="*60, flush=True)
+
     tracer.clear()
-    
-    # Force the trigger type to 'mock' for isolation
     scenario = scenario or {}
     scenario["trigger_type"] = "mock"
-    
+
+    # ── Seed incidents into Firestore so the pipeline has data ──────────
+    # These are hardcoded demo incidents for Islamabad.
+    # The pipeline Stages 2-5 will then classify, plan, simulate them.
+    SEED_INCIDENTS = [
+        {
+            "type": "flood",
+            "severity": "HIGH",
+            "confidence": 0.5,
+            "location_name": "G-10, Islamabad",
+            "lat": 33.6938,
+            "lng": 73.0213,
+            "signal_source": "Stress Test",
+        },
+        {
+            "type": "heatwave",
+            "severity": "MEDIUM",
+            "confidence": 0.5,
+            "location_name": "I-8, Islamabad",
+            "lat": 33.6761,
+            "lng": 73.0651,
+            "signal_source": "Stress Test",
+        },
+    ]
+
+    seeded_ids = []
+    for inc in SEED_INCIDENTS:
+        try:
+            inc_id = create_incident(**inc)
+            seeded_ids.append(inc_id)
+            print(f"[SCENARIO] Seeded incident {inc_id} — {inc['type']} @ {inc['location_name']}")
+            tracer.log(
+                agent_name="System",
+                action=f"Seeded mock incident: {inc['type'].upper()} at {inc['location_name']}",
+                input_data={"type": inc["type"], "severity": inc["severity"]},
+                output_data={"id": inc_id},
+                confidence=1.0,
+            )
+        except Exception as e:
+            print(f"[SCENARIO] Failed to seed incident: {e}")
+
+    # Verify seeds are visible
+    active = query_active_incidents()
+    print(f"[SCENARIO] Active incidents after seeding: {len(active)}")
+
     try:
-        # Run the agent pipeline in mock isolation mode
         result = await run_crisis_simulation(scenario_data=scenario)
-        
+        final_active = query_active_incidents()
         return {
             "status": "success",
             "result": result,
-            "traces": tracer.get_traces()
+            "incidents_seeded": len(seeded_ids),
+            "incidents_active": len(final_active),
+            "traces": tracer.get_traces(),
         }
     except Exception as e:
         import traceback
         error_msg = str(e)
         stack_trace = traceback.format_exc()
-        
+        print(f"[SCENARIO] Pipeline error: {error_msg}")
+        print(stack_trace)
         tracer.log(
             agent_name="System",
             action="simulation_error",
-            input_data={"scenario": scenario},
-            output_data={"error": error_msg, "traceback": stack_trace},
-            confidence=0.0
+            input_data={"scenario": str(scenario)[:200]},
+            output_data={"error": error_msg},
+            confidence=0.0,
         )
         return {
             "status": "error",
-            "message": error_msg
+            "message": error_msg,
+            "traceback": stack_trace,
         }
 
 @router.get("/logs")
