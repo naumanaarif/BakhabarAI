@@ -2,11 +2,31 @@
   {
     "signal_id": "ec_001",
     "source_type": "emergency_call",
-    "source_name": "1122 Dispatch",
-    "timestamp": "2024-01-15T14:40:00Z",
-    "location": { "name": "G-10/4, Islamabad", "lat": 33.6800, "lng": 73.0400 },
-    "content": "Caller reports basement flooding in residential house.",
-    "credibility_score": 0.9,
+    "source_name": "1122 Rescue Dispatch",
+    "timestamp": "2025-08-10T07:30:00Z",
+    "location": { "name": "Korangi No. 4, Karachi", "lat": 24.8310, "lng": 67.1280 },
+    "content": "Caller: 'Hamaare ghar mein 3 feet paani aa gaya hai, bachche chhatt par hain, please jaldi aao!' Address: House B-47, Korangi No. 4.",
+    "credibility_score": 0.95,
+    "is_mock": true
+  },
+  {
+    "signal_id": "ec_002",
+    "source_type": "emergency_call",
+    "source_name": "Edhi Foundation Dispatch",
+    "timestamp": "2025-06-20T11:35:00Z",
+    "location": { "name": "Orangi Town Sector 11-C, Karachi", "lat": 24.9510, "lng": 66.9980 },
+    "content": "Mass heat stroke emergency — multiple collapses at Pakistan Chowk and Qasba Colony. Edhi dispatching 3 ambulances. 20+ potential victims. JPMC and Civil Hospital informed.",
+    "credibility_score": 0.95,
+    "is_mock": true
+  },
+  {
+    "signal_id": "ec_003",
+    "source_type": "emergency_call",
+    "source_name": "1122 Rescue Dispatch",
+    "timestamp": "2025-06-20T11:50:00Z",
+    "location": { "name": "M-9 Motorway Toll Plaza, Karachi", "lat": 24.8910, "lng": 67.2710 },
+    "content": "Caller reports tanker overturned on M-9. Fuel spill. At least 12 injured, 2 critical. Fire risk present. Emergency services need to be rerouted — M-9 completely sealed.",
+    "credibility_score": 0.97,
     "is_mock": true
   }
 ]
