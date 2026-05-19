@@ -22,7 +22,6 @@ class _MapScreenState extends State<MapScreen> {
   
   bool _hasLocationPermission = false;
   GoogleMapController? _mapController;
-  final Set<Marker> _markers = {};
   
   String _selectedFilter = 'All'; // 'All', 'Flood', 'Heatwave', 'Accident'
   final TextEditingController _searchController = TextEditingController();
@@ -47,6 +46,16 @@ class _MapScreenState extends State<MapScreen> {
     _checkLocationPermission();
   }
 
+  IconData _getIconForType(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('flood')) return LucideIcons.waves;
+    if (t.contains('heat')) return LucideIcons.thermometerSun;
+    if (t.contains('accident')) return LucideIcons.car;
+    if (t.contains('fire')) return LucideIcons.flame;
+    if (t.contains('power')) return LucideIcons.zap;
+    return LucideIcons.alertTriangle;
+  }
+
   Future<void> _checkLocationPermission() async {
     final permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
@@ -59,62 +68,6 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
     }
-  }
-
-  void _buildMarkers(List<Incident> incidents) {
-    final filtered = _selectedFilter == 'All' 
-        ? incidents 
-        : incidents.where((i) => i.type.toLowerCase().contains(_selectedFilter.toLowerCase())).toList();
-
-    // Skip if nothing changed to save CPU/GPU (crude but effective for lag)
-    if (_markers.length == filtered.length && _markers.isNotEmpty) {
-      // Basic check: if count is same, we might still want to update but for now 
-      // let's assume it's stable to reduce lag
-      return;
-    }
-
-    final Set<Marker> newMarkers = {};
-    for (var incident in filtered) {
-      double hue;
-      switch (incident.severity.toUpperCase()) {
-        case 'HIGH':
-        case 'CRITICAL':
-          hue = BitmapDescriptor.hueRed;
-          break;
-        case 'MEDIUM':
-        case 'ELEVATED':
-          hue = BitmapDescriptor.hueOrange;
-          break;
-        case 'LOW':
-        case 'ROUTINE':
-        default:
-          hue = BitmapDescriptor.hueGreen;
-          break;
-      }
-
-      newMarkers.add(
-        Marker(
-          markerId: MarkerId(incident.id),
-          position: LatLng(incident.location.lat, incident.location.lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(hue),
-          infoWindow: InfoWindow(
-            title: '${incident.type.toUpperCase()} - ${incident.severity}',
-            snippet: incident.location.name,
-          ),
-          onTap: () {
-            setState(() {
-              _selectedIncidentForPanel = incident;
-              _showPanel = true;
-            });
-          },
-        ),
-      );
-    }
-    
-    setState(() {
-      _markers.clear();
-      _markers.addAll(newMarkers);
-    });
   }
 
   void _zoomToUserLocation({bool showSnackBar = true}) async {
@@ -160,7 +113,6 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     // Periodically check permission if we haven't zoomed yet 
-    // (handles case where permission is granted on another tab)
     if (!_hasInitialZoom) {
       _checkLocationPermission();
     }
@@ -170,52 +122,78 @@ class _MapScreenState extends State<MapScreen> {
       body: StreamBuilder<List<Incident>>(
         stream: _incidentsStream,
         builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            // Update markers locally without triggering a full state rebuild loop
-            final incidents = snapshot.data!;
-            final filtered = _selectedFilter == 'All' 
-                ? incidents 
-                : incidents.where((i) => i.type.toLowerCase().contains(_selectedFilter.toLowerCase())).toList();
+          final incidents = snapshot.data ?? [];
+          final filtered = _selectedFilter == 'All' 
+              ? incidents 
+              : incidents.where((i) => i.type.toLowerCase().contains(_selectedFilter.toLowerCase())).toList();
 
-            if (_markers.length != filtered.length || _markers.isEmpty) {
-              _markers.clear();
-              for (var incident in filtered) {
-                double hue;
-                switch (incident.severity.toUpperCase()) {
-                  case 'HIGH':
-                  case 'CRITICAL':
-                    hue = BitmapDescriptor.hueRed;
-                    break;
-                  case 'MEDIUM':
-                  case 'ELEVATED':
-                    hue = BitmapDescriptor.hueOrange;
-                    break;
-                  case 'LOW':
-                  case 'ROUTINE':
-                  default:
-                    hue = BitmapDescriptor.hueGreen;
-                    break;
-                }
+          final Set<Marker> markers = {};
+          final Set<Circle> circles = {};
 
-                _markers.add(
-                  Marker(
-                    markerId: MarkerId(incident.id),
-                    position: LatLng(incident.location.lat, incident.location.lng),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(hue),
-                    infoWindow: InfoWindow(
-                      title: '${incident.type.toUpperCase()} - ${incident.severity}',
-                      snippet: incident.location.name,
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedIncidentForPanel = incident;
-                        _showPanel = true;
-                      });
-                    },
-                  ),
-                );
-              }
+          for (var incident in filtered) {
+            Color color;
+            double hue;
+            double radius;
+
+            switch (incident.severity.toUpperCase()) {
+              case 'HIGH':
+              case 'CRITICAL':
+                color = AppColors.severityHigh;
+                hue = BitmapDescriptor.hueRed;
+                radius = 500;
+                break;
+              case 'MEDIUM':
+              case 'ELEVATED':
+                color = AppColors.severityMedium;
+                hue = BitmapDescriptor.hueOrange;
+                radius = 300;
+                break;
+              case 'LOW':
+              case 'ROUTINE':
+              default:
+                color = AppColors.severityLow;
+                hue = BitmapDescriptor.hueGreen;
+                radius = 200;
+                break;
             }
+
+            final position = LatLng(incident.location.lat, incident.location.lng);
+
+            markers.add(
+              Marker(
+                markerId: MarkerId(incident.id),
+                position: position,
+                icon: BitmapDescriptor.defaultMarkerWithHue(hue),
+                onTap: () {
+                  setState(() {
+                    _selectedIncidentForPanel = incident;
+                    _showPanel = true;
+                  });
+                  // Use microtask to avoid frame lag during state change
+                  Future.microtask(() {
+                    _mapController?.animateCamera(CameraUpdate.newLatLng(position));
+                  });
+                },
+              ),
+            );
+
+            circles.add(
+              Circle(
+                circleId: CircleId('${incident.id}_zone'),
+                center: position,
+                radius: radius,
+                fillColor: color.withOpacity(0.15),
+                strokeColor: color.withOpacity(0.5),
+                strokeWidth: 2,
+                consumeTapEvents: true, // Prevent map 'onTap' from hiding panel immediately
+                onTap: () {
+                  setState(() {
+                    _selectedIncidentForPanel = incident;
+                    _showPanel = true;
+                  });
+                },
+              ),
+            );
           }
 
           return Stack(
@@ -223,7 +201,8 @@ class _MapScreenState extends State<MapScreen> {
               // Google Map
               GoogleMap(
                 initialCameraPosition: _initialCameraPosition,
-                markers: _markers,
+                markers: markers,
+                circles: circles,
                 myLocationEnabled: _hasLocationPermission,
                 myLocationButtonEnabled: false,
                 zoomControlsEnabled: false,
@@ -235,9 +214,11 @@ class _MapScreenState extends State<MapScreen> {
                   }
                 },
                 onTap: (_) {
-                  setState(() {
-                    _showPanel = false;
-                  });
+                  if (_showPanel) {
+                    setState(() {
+                      _showPanel = false;
+                    });
+                  }
                 },
               ),
               
@@ -286,9 +267,12 @@ class _MapScreenState extends State<MapScreen> {
                       child: Row(
                         children: [
                           _buildFilterChip('All', LucideIcons.layers),
-                          _buildFilterChip('Flood', LucideIcons.waves),
-                          _buildFilterChip('Heatwave', LucideIcons.thermometerSun),
-                          _buildFilterChip('Accident', LucideIcons.car),
+                          ...(snapshot.data ?? []).map((i) => i.type).toSet().map((type) => 
+                            _buildFilterChip(
+                              type[0].toUpperCase() + type.substring(1).toLowerCase(), 
+                              _getIconForType(type)
+                            )
+                          ),
                         ],
                       ),
                     ),
@@ -405,23 +389,25 @@ class _MapScreenState extends State<MapScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    incident.type.toLowerCase().contains('flood') ? LucideIcons.waves : LucideIcons.alertTriangle,
-                    color: severityColor,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${incident.location.name.split(',')[0]} ${incident.type.toUpperCase()}',
-                      style: AppTextStyles.h2.copyWith(fontSize: 18),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      incident.type.toLowerCase().contains('flood') ? LucideIcons.waves : LucideIcons.alertTriangle,
+                      color: severityColor,
+                      size: 22,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${incident.location.name.split(',')[0]} ${incident.type.toUpperCase()}',
+                        style: AppTextStyles.h2.copyWith(fontSize: 18),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: AppColors.textMuted, size: 20),

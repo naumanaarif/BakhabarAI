@@ -161,10 +161,16 @@ class _ResourceAllocationScreenState extends State<ResourceAllocationScreen> {
     final medical = resources.where((r) => r.type == 'Medical').toList();
     final police = resources.where((r) => r.type == 'Police').toList();
     final rescue = resources.where((r) => r.type == 'Fire' || r.type == 'Rescue').toList();
+    final water = resources.where((r) => r.type == 'Water_Management').toList();
+    final recon = resources.where((r) => r.type == 'Recon').toList();
+    final logistics = resources.where((r) => r.type == 'Logistics').toList();
 
     final medicalAvailable = medical.where((r) => r.status == 'available').length;
     final policeAvailable = police.where((r) => r.status == 'available').length;
     final rescueAvailable = rescue.where((r) => r.status == 'available').length;
+    final waterAvailable = water.where((r) => r.status == 'available').length;
+    final reconAvailable = recon.where((r) => r.status == 'available').length;
+    final logisticsAvailable = logistics.where((r) => r.status == 'available').length;
 
     return Card(
       color: Colors.white,
@@ -208,6 +214,33 @@ class _ResourceAllocationScreenState extends State<ResourceAllocationScreen> {
               count: '$rescueAvailable / ${rescue.length}',
               progress: rescue.isEmpty ? 0 : rescueAvailable / rescue.length,
               color: AppColors.dangerRed,
+            ),
+            const SizedBox(height: 16),
+
+            _buildResourcePoolRow(
+              icon: LucideIcons.waves,
+              title: 'Water Management',
+              count: '$waterAvailable / ${water.length}',
+              progress: water.isEmpty ? 0 : waterAvailable / water.length,
+              color: Colors.blueAccent,
+            ),
+            const SizedBox(height: 16),
+
+            _buildResourcePoolRow(
+              icon: LucideIcons.scan,
+              title: 'Drones & Recon',
+              count: '$reconAvailable / ${recon.length}',
+              progress: recon.isEmpty ? 0 : reconAvailable / recon.length,
+              color: Colors.purpleAccent,
+            ),
+            const SizedBox(height: 16),
+
+            _buildResourcePoolRow(
+              icon: LucideIcons.truck,
+              title: 'Logistics',
+              count: '$logisticsAvailable / ${logistics.length}',
+              progress: logistics.isEmpty ? 0 : logisticsAvailable / logistics.length,
+              color: Colors.orangeAccent,
             ),
           ],
         ),
@@ -387,6 +420,18 @@ class _ResourceAllocationScreenState extends State<ResourceAllocationScreen> {
                         case 'Rescue':
                           icon = LucideIcons.hardHat;
                           color = AppColors.dangerRed;
+                          break;
+                        case 'Water_Management':
+                          icon = LucideIcons.waves;
+                          color = Colors.blueAccent;
+                          break;
+                        case 'Recon':
+                          icon = LucideIcons.scan;
+                          color = Colors.purpleAccent;
+                          break;
+                        case 'Logistics':
+                          icon = LucideIcons.truck;
+                          color = Colors.orangeAccent;
                           break;
                         default:
                           icon = LucideIcons.package;

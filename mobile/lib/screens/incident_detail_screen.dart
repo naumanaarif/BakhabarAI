@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme.dart';
+import '../core/utils.dart';
 import '../models/incident.dart';
 import '../services/api_service.dart';
 import 'resource_allocation_screen.dart';
@@ -162,224 +163,242 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     children: [
                       const Icon(LucideIcons.mapPin, size: 16, color: AppColors.textMuted),
                       const SizedBox(width: 6),
-                      Text(incident.location.name, style: AppTextStyles.bodyMuted.copyWith(fontSize: 13)),
+                      Expanded(
+                        child: Text(
+                          incident.location.name,
+                          style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.calendar, size: 16, color: AppColors.textMuted),
+                      const SizedBox(width: 6),
+                      Text(
+                        TimeUtils.formatFullDateTime(incident.timestamp),
+                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // Surveillance Image Card
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        )
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Stack(
-                        children: [
-                          Image.network(
-                            'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&q=80&w=800', // Generic high-res surveillance-like placeholder
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) => const Center(child: Icon(LucideIcons.image, size: 48, color: AppColors.textMuted)),
-                          ),
-                          // Play button overlay
-                          Positioned.fill(
-                            child: Container(
-                              color: Colors.black.withOpacity(0.15),
-                              child: Center(
-                                child: Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.85),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.3)),
-                                  ),
-                                  child: const Icon(LucideIcons.play, color: AppColors.textPrimary, size: 24),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Live Badge
-                          Positioned(
-                            top: 12,
-                            left: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.dangerRed,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'LIVE FEED',
-                                    style: AppTextStyles.label.copyWith(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  if (incident.mediaUrl != null) ...[
+                    // Surveillance Image Card
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          )
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Bento Cards
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Severity & Confidence Card
-                      Expanded(
-                        child: Card(
-                          margin: EdgeInsets.zero,
-                          color: Colors.white,
-                          elevation: 2,
-                          shadowColor: Colors.black.withOpacity(0.04),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          const Icon(LucideIcons.alertTriangle, color: AppColors.accent, size: 20),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              incident.type,
-                                              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 13),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          children: [
+                            Image.network(
+                              incident.mediaUrl!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stackTrace) => const Center(child: Icon(LucideIcons.image, size: 48, color: AppColors.textMuted)),
+                            ),
+                            // Play button overlay (optional if it's a video)
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black.withOpacity(0.15),
+                                child: Center(
+                                  child: Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.85),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: _getSeverityBgColor(incident.severity),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        incident.severity,
-                                        style: AppTextStyles.label.copyWith(
-                                          color: severityColor,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 28),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('AI Confidence', style: AppTextStyles.labelMuted.copyWith(fontSize: 11)),
-                                    Text('$confidencePercent%', style: AppTextStyles.label.copyWith(fontSize: 11, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: incident.confidence,
-                                    color: AppColors.accent,
-                                    backgroundColor: AppColors.primary,
-                                    minHeight: 6,
+                                    child: const Icon(LucideIcons.play, color: AppColors.textPrimary, size: 24),
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                            // Live Badge
+                            Positioned(
+                              top: 12,
+                              left: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.dangerRed,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'MEDIA ATTACHED',
+                                      style: AppTextStyles.label.copyWith(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
-                      // Signal Sources Card
-                      Expanded(
-                        child: Card(
-                          margin: EdgeInsets.zero,
-                          color: Colors.white,
-                          elevation: 2,
-                          shadowColor: Colors.black.withOpacity(0.04),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Signal Sources',
-                                  style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Correlated ground data',
-                                  style: AppTextStyles.bodyMuted.copyWith(fontSize: 11),
-                                ),
-                                const SizedBox(height: 12),
-                                if (incident.signalSources != null && incident.signalSources!.isNotEmpty)
-                                  ...incident.signalSources!.toSet().take(3).map((source) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
+                  // Bento Cards
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Severity & Confidence Card
+                      Card(
+                        margin: EdgeInsets.zero,
+                        color: Colors.white,
+                        elevation: 2,
+                        shadowColor: Colors.black.withOpacity(0.04),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
                                     child: Row(
                                       children: [
-                                        const Icon(LucideIcons.radio, size: 12, color: AppColors.successGreen),
-                                        const SizedBox(width: 6),
+                                        const Icon(LucideIcons.alertTriangle, color: AppColors.accent, size: 20),
+                                        const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            source.toUpperCase(),
-                                            style: AppTextStyles.label.copyWith(fontSize: 10),
+                                            incident.type.toUpperCase(),
+                                            style: AppTextStyles.label.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  )).toList()
-                                else
-                                  Row(
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _getSeverityBgColor(incident.severity),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      incident.severity,
+                                      style: AppTextStyles.label.copyWith(
+                                        color: severityColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('AI Confidence', style: AppTextStyles.labelMuted.copyWith(fontSize: 12)),
+                                  Text('$confidencePercent%', style: AppTextStyles.label.copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: incident.confidence,
+                                  color: AppColors.accent,
+                                  backgroundColor: AppColors.primary,
+                                  minHeight: 6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Signal Sources Card
+                      Card(
+                        margin: EdgeInsets.zero,
+                        color: Colors.white,
+                        elevation: 2,
+                        shadowColor: Colors.black.withOpacity(0.04),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Signal Sources',
+                                style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Correlated ground data',
+                                style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
+                              ),
+                              const SizedBox(height: 12),
+                              if (incident.signalSources != null && incident.signalSources!.isNotEmpty)
+                                ...incident.signalSources!.toSet().take(3).map((source) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Row(
                                     children: [
-                                      const Icon(LucideIcons.radio, size: 12, color: AppColors.textMuted),
-                                      const SizedBox(width: 6),
-                                      Text('Primary Feed Alpha', style: AppTextStyles.label.copyWith(fontSize: 10)),
+                                      const Icon(LucideIcons.radio, size: 12, color: AppColors.successGreen),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          source.toUpperCase(),
+                                          style: AppTextStyles.label.copyWith(fontSize: 12),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ],
                                   ),
-                              ],
-                            ),
+                                )).toList()
+                              else
+                                Row(
+                                  children: [
+                                    const Icon(LucideIcons.radio, size: 12, color: AppColors.textMuted),
+                                    const SizedBox(width: 8),
+                                    Text('Primary Feed Alpha', style: AppTextStyles.label.copyWith(fontSize: 12)),
+                                  ],
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -411,7 +430,9 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                                   ],
                                 ),
                                 Text(
-                                  'Est. ${incident.affectedPopulation}',
+                                  incident.affectedPopulation > 0 
+                                      ? 'Est. ${incident.affectedPopulation}'
+                                      : 'Calculating...',
                                   style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                               ],
@@ -431,7 +452,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                                   ],
                                 ),
                                 Text(
-                                  incident.expectedDurationHours != null 
+                                  (incident.expectedDurationHours != null && incident.expectedDurationHours! > 0)
                                       ? '${incident.expectedDurationHours} Hours'
                                       : 'Analyzing...',
                                   style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, fontSize: 14),

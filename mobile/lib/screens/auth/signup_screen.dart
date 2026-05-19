@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme.dart';
 import 'otp_screen.dart';
 
@@ -28,42 +29,82 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     setState(() => _isLoading = true);
-    // Simulate sending OTP
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isLoading = false);
+    
+    final fullPhoneNumber = '+92$phone';
 
-    if (mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => Scaffold(
-            backgroundColor: AppColors.primary,
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              centerTitle: true,
-              title: const Text(
-                'BakhabarAI',
-                style: TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: AppColors.textPrimary,
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullPhoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-resolution (rare on iOS, common on Android)
+          try {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+            if (mounted) {
+               setState(() => _isLoading = false);
+               // If auto resolved, we can just assume they are authenticated
+               widget.onAuthenticated("User"); // or prompt for name
+            }
+          } catch (e) {
+            debugPrint("Auto sign-in failed: $e");
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message ?? 'Verification failed.'),
+              backgroundColor: AppColors.dangerRed,
+            ),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          setState(() => _isLoading = false);
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => Scaffold(
+                  backgroundColor: AppColors.primary,
+                  appBar: AppBar(
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    centerTitle: true,
+                    title: const Text(
+                      'BakhabarAI',
+                      style: TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  body: OtpScreen(
+                    phoneNumber: fullPhoneNumber,
+                    verificationId: verificationId,
+                    onAuthenticated: (name) {
+                      Navigator.of(context).pop();
+                      widget.onAuthenticated(name);
+                    },
+                  ),
                 ),
               ),
-            ),
-            body: OtpScreen(
-              phoneNumber: '+92 $phone',
-              onAuthenticated: (name) {
-                // Pop the OTP screen and notify authentication succeeded
-                Navigator.of(context).pop();
-                widget.onAuthenticated(name);
-              },
-            ),
-          ),
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Timeout handling
+        },
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppColors.dangerRed,
         ),
       );
     }

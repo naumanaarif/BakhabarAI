@@ -27,6 +27,14 @@ class FirebaseService:
         return [{**doc.to_dict(), "id": doc.id} for doc in docs]
 
     @staticmethod
+    def get_signal_by_id(signal_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a specific signal by ID."""
+        doc = db.collection("signals").document(signal_id).get()
+        if doc.exists:
+            return {**doc.to_dict(), "id": doc.id}
+        return None
+
+    @staticmethod
     def update_signal_status(signal_id: str, status: str, credibility_score: float = None, incident_id: str = None):
         """Updates the status and metadata of a signal."""
         update_data = {"status": status}
@@ -35,6 +43,19 @@ class FirebaseService:
         if incident_id is not None:
             update_data["incident_id"] = incident_id
         
+        # Propagate media_url from signal to incident
+        if incident_id:
+            try:
+                signal_doc = db.collection("signals").document(signal_id).get()
+                if signal_doc.exists:
+                    media_url = signal_doc.to_dict().get("metadata", {}).get("media_url")
+                    if media_url:
+                        incident_doc = db.collection("incidents").document(incident_id).get()
+                        if incident_doc.exists and not incident_doc.to_dict().get("media_url"):
+                            db.collection("incidents").document(incident_id).update({"media_url": media_url})
+            except Exception as e:
+                print(f"Error propagating media_url: {e}")
+
         db.collection("signals").document(signal_id).update(update_data)
 
     @staticmethod
@@ -46,24 +67,45 @@ class FirebaseService:
         return None
 
     @staticmethod
-    def create_incident(incident_type: str, severity: str, confidence: float, location_name: str, lat: float, lng: float, population: int = 0, signal_source: str = None):
-        """Creates a new incident record or updates confidence if it exists nearby."""
+    def create_incident(incident_type: str, severity: str, confidence: float, location_name: str, lat: float, lng: float, population: int = 0, signal_source: str = None, media_url: str = None):
+        """Creates a new incident record or updates existing one if nearby."""
         # Check for existing incident at the same location name
         existing = db.collection("incidents").where(filter=FieldFilter("location_name", "==", location_name)).where(filter=FieldFilter("status", "==", "active")).limit(1).get()
         
         if existing:
             doc = existing[0]
             data = doc.to_dict()
-            new_confidence = min(1.0, data.get("confidence_score", 0.0) + 0.1)
+            
+            # If the incident type is different, it's a correction/reclassification
+            # If the new signal source is highly reliable (sensor/field), we adopt its type
+            new_type = data.get("type")
+            if signal_source in ["sensor", "field_report"] and incident_type != new_type:
+                new_type = incident_type
+                
+            # Confidence logic: 
+            # - If it's a verification of the same type, increase confidence.
+            # - If it's a contradiction/correction, the confidence might change based on the new signal.
+            if incident_type == data.get("type"):
+                new_confidence = min(1.0, data.get("confidence_score", 0.0) + 0.1)
+            else:
+                # If a field report corrects a social report, we might lower confidence of the "incident" 
+                # or just switch to the new type with the new signal's confidence
+                new_confidence = confidence
+
             sources = data.get("signal_sources", [])
             if signal_source and signal_source not in sources:
                 sources.append(signal_source)
             
-            db.collection("incidents").document(doc.id).update({
+            update_payload = {
+                "type": new_type,
                 "confidence_score": new_confidence,
                 "signal_sources": sources,
                 "last_updated": datetime.now()
-            })
+            }
+            if media_url and not data.get("media_url"):
+                update_payload["media_url"] = media_url
+
+            db.collection("incidents").document(doc.id).update(update_payload)
             return doc.id
 
         incident_data = {
@@ -80,6 +122,9 @@ class FirebaseService:
             "timestamp": datetime.now(),
             "last_updated": datetime.now()
         }
+        if media_url:
+            incident_data["media_url"] = media_url
+            
         _, doc_ref = db.collection("incidents").add(incident_data)
         return doc_ref.id
 

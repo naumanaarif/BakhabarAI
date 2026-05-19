@@ -1,79 +1,90 @@
+from typing import List
+import json
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.firebase_tools import query_active_incidents, update_incident_details
 from tracer import tracer
 from .model_config import get_model
-import json
 
-async def classify_and_predict() -> str:
+async def process_incident_classifications(payload: dict = None, **kwargs) -> str:
     """
-    Fetches active incidents from Firestore, classifies them, 
-    and predicts their evolution and impact.
+    Commits your detailed crisis classification.
     """
-    incidents = query_active_incidents()
-    if not incidents:
-        return "No active incidents to classify."
+    import re
+    # DANGEROUS HALLUCINATION FIX: Strip any <function=...> tags if the AI nested them
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        try: payload = json.loads(payload)
+        except: payload = {}
+
+    classifications = payload.get("classifications", [])
+    if isinstance(classifications, dict) and "classifications" in classifications:
+        classifications = classifications["classifications"]
     
-    classification_results = []
-    for inc in incidents:
-        # Get current confidence or default to 0.5
-        current_confidence = inc.get('confidence_score', 0.5)
-        
-        # Simulation logic: Detector verification adds to confidence
-        # but doesn't necessarily jump to 100% instantly
-        verified_confidence = min(0.98, current_confidence + 0.15)
-        
-        # Intelligent classification based on location or existing data
-        loc_name = inc.get('location_name', '').lower()
-        if 'margalla' in loc_name:
-            predicted_type = 'wildfire'
-            severity = 'HIGH'
-            population = 5000
-        elif 'i-8' in loc_name or 'heat' in inc.get('type', '').lower():
-            predicted_type = 'heatwave'
-            severity = 'MEDIUM'
-            population = 25000
-        else:
-            predicted_type = "urban_flooding" if inc.get('type') == 'unknown' else inc['type']
-            severity = "HIGH"
-            population = 15000
-        
-        evolution = {
-            "expected_duration_hours": 12 if predicted_type == 'wildfire' else 8,
-            "peak_impact_time": "2024-01-15T20:00:00Z",
-            "spread_risk": "HIGH" if predicted_type == 'wildfire' else "MEDIUM",
-            "uncertainty_range": "+/- 2 hours"
-        }
-        
-        update_data = {
-            "type": predicted_type,
-            "severity": severity,
-            "affected_population": population,
-            "evolution_prediction": evolution,
-            "confidence_score": verified_confidence
-        }
-        
-        update_incident_details(inc['id'], update_data)
-        classification_results.append({
-            "incident_id": inc['id'],
-            "type": predicted_type,
-            "severity": severity
-        })
+    if not isinstance(classifications, (list, tuple)):
+        return "ERROR: Expected a list of classifications."
 
-    return json.dumps(classification_results)
+    results = []
+    processed_ids = set()
+    
+    for cl in classifications:
+        if not isinstance(cl, dict): continue
+        incident_id = cl.pop('incident_id', cl.pop('id', None))
+        if not incident_id or incident_id == "null" or incident_id in processed_ids:
+            continue
+
+        processed_ids.add(incident_id)
+        
+        # CLEANUP: Remove any nulls or "analyzing" strings
+        clean_cl = {k: v for k, v in cl.items() if v is not None and v != "null" and v != "unknown"}
+        
+        # Ensure numeric values
+        for k in ['affected_population', 'expected_duration_hours']:
+            if k in clean_cl:
+                try: clean_cl[k] = int(float(str(clean_cl[k])))
+                except: del clean_cl[k]
+
+        if clean_cl:
+            update_incident_details(incident_id, clean_cl)
+            results.append(incident_id)
+
+    return json.dumps(results)
 
 detector_agent = Agent(
     name="DetectorAgent",
-    model=get_model(),
-    description="Classifies crisis type and predicts severity and evolution using Firestore state.",
+    model=get_model("DetectorAgent"),
+    description="Classifies crisis type and predicts severity and evolution.",
     tools=[
-        FunctionTool(classify_and_predict)
+        FunctionTool(process_incident_classifications)
     ],
     instruction="""
-    SYSTEM DIRECTIVE:
-    1. You must IMMEDIATELY call 'classify_and_predict' with NO arguments.
-    2. After the tool returns, summarize the number of incidents classified in one sentence.
-    3. TERMINATE after the summary.
-    Do NOT attempt to classify incidents without using the tool.
+    You are the Crisis Detector Agent. Your ONLY job is to analyze 'active_incidents' and call 'process_incident_classifications' ONCE.
+
+    REQUIRED JSON FORMAT:
+    {
+      "payload": {
+        "classifications": [
+          {
+            "id": "INCIDENT_ID_HERE",
+            "type": "accident",
+            "severity": "HIGH",
+            "affected_population": 1500,
+            "expected_duration_hours": 12,
+            "evolution_prediction": {
+              "duration_hours": 12,
+              "peak_time": "2026-05-19T20:00:00",
+              "spread_risk": "LOW"
+            }
+          }
+        ]
+      }
+    }
+
+    STRICT RULES:
+    1. Call the process_incident_classifications tool.
+    2. Pass the 'payload' parameter as an object exactly matching the format above.
+    3. 'affected_population' MUST be a realistic estimate. NEVER use 0. If population is unknown, estimate at least 800 for urban areas.
+    4. Stop after calling the tool.
     """
 )

@@ -18,7 +18,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
   late Stream<List<ActionSimulation>> _simulationsStream;
   late Stream<List<Incident>> _incidentsStream;
   
-  int _selectedTab = 0; // 0: Flood, 1: Heatwave, 2: Alerts
+  String _selectedCategory = 'ALL';
 
   @override
   void initState() {
@@ -77,14 +77,33 @@ class _SimulationScreenState extends State<SimulationScreen> {
               final simulations = simSnapshot.data ?? [];
               final incidents = incSnapshot.data ?? [];
 
-              String filterType = _selectedTab == 0 ? 'flood' : _selectedTab == 1 ? 'heatwave' : 'alert';
+              // Dynamically extract types from active simulations
+              final activeTypes = simulations.map((sim) {
+                final incident = incidents.firstWhere(
+                  (inc) => inc.id == sim.incidentId,
+                  orElse: () => Incident(
+                    id: 'unknown',
+                    type: 'Alert',
+                    location: Location(name: 'Unknown', lat: 0, lng: 0),
+                    severity: 'LOW',
+                    confidence: 0,
+                    affectedPopulation: 0,
+                    status: '',
+                  ),
+                );
+                return incident.type.toUpperCase();
+              }).toSet().toList();
               
+              activeTypes.sort();
+              activeTypes.insert(0, 'ALL');
+
               final filteredSims = simulations.where((sim) {
+                if (_selectedCategory == 'ALL') return true;
                 final incident = incidents.firstWhere(
                   (inc) => inc.id == sim.incidentId, 
                   orElse: () => Incident(
                     id: 'unknown', 
-                    type: 'unknown', 
+                    type: 'Alert', 
                     location: Location(name: 'Unknown', lat: 0, lng: 0), 
                     severity: 'LOW', 
                     confidence: 0, 
@@ -92,9 +111,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                     status: ''
                   )
                 );
-                // If it's a fresh demo, show all simulations in the 'Flood' tab as a default
-                if (_selectedTab == 0 && (incident.type.toLowerCase().contains('flood') || incident.id == 'unknown')) return true;
-                return incident.type.toLowerCase().contains(filterType);
+                return incident.type.toUpperCase() == _selectedCategory;
               }).toList();
 
               return SingleChildScrollView(
@@ -113,15 +130,11 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Tab pills
+                      // Dynamic Tab pills
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: [
-                            _buildTabPill(0, 'Flood'),
-                            _buildTabPill(1, 'Heatwave'),
-                            _buildTabPill(2, 'Alerts'),
-                          ],
+                          children: activeTypes.map((type) => _buildTabPill(type)).toList(),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -134,7 +147,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                               children: [
                                 const Icon(LucideIcons.barChart2, size: 48, color: AppColors.textMuted),
                                 const SizedBox(height: 16),
-                                Text('No active simulations for this category', style: AppTextStyles.bodyMuted),
+                                Text('No active simulations for $_selectedCategory', style: AppTextStyles.bodyMuted),
                               ],
                             ),
                           ),
@@ -405,12 +418,12 @@ class _SimulationScreenState extends State<SimulationScreen> {
     );
   }
 
-  Widget _buildTabPill(int index, String title) {
-    final isSelected = _selectedTab == index;
+  Widget _buildTabPill(String title) {
+    final isSelected = _selectedCategory == title;
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedTab = index;
+          _selectedCategory = title;
         });
       },
       child: Container(

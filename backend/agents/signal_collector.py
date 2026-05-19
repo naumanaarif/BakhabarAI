@@ -1,3 +1,5 @@
+import json
+from typing import List, Dict, Any
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.firebase_tools import (
@@ -9,99 +11,128 @@ from tools.firebase_tools import (
 )
 from tracer import tracer
 from .model_config import get_model
-import json
 
-async def fuse_and_verify_signals() -> str:
-    """
-    Ingests pending signals from Firestore, evaluates credibility, 
-    handles contradictions, and creates/updates incidents.
-    """
-    signals = get_pending_signals()
-    if not signals:
-        return "No new signals to process."
 
-    active_incidents = query_active_incidents()
-    
+async def process_signal_evaluations(payload: dict = None, **kwargs) -> str:
+    """
+    Commits analysis of emergency signals. 
+    """
+    from services.firebase_service import FirebaseService
+    from firebase_config import db
+    import google.cloud.firestore as firestore
+
     results = []
-    for signal in signals:
-        # Evaluate signal (This would normally be an LLM-driven internal step, 
-        # but we expose it via the tool's reasoning trace)
-        credibility = 0.8  # Default baseline
-        status = "verified"
-        
-        # Check for contradictions (Requirement 5/10)
-        # Example: If a sensor contradicts social media
-        if signal['source_type'] == 'sensor' and signal['content'].lower().find('normal') != -1:
-            # If we already have an active incident nearby based on social reports
-            # this sensor might be the 'truth' that marks it as a false alarm
-            status = "contradicted"
-            credibility = 1.0
+    processed_signal_ids = set()
 
-        location_name = signal.get('location_name') or signal.get('metadata', {}).get('location_name') or 'Unknown'
-        
-        # Create/Update Incident logic
-        incident_id = None
-        # Simple spatial grouping for prototype (approximate same location)
-        for inc in active_incidents:
-            if inc.get('location_name') == location_name:
-                incident_id = inc['id']
-                break
-        
-        if not incident_id and status == "verified":
-            # Better initial type guess for notifications
-            initial_type = "Incident"
-            content_lower = signal['content'].lower()
-            if 'flood' in content_lower or 'pani' in content_lower or 'water' in content_lower:
-                initial_type = 'flooding'
-            elif 'fire' in content_lower or 'smoke' in content_lower or 'dhuan' in content_lower:
-                initial_type = 'fire'
-            elif 'heat' in content_lower or 'garmi' in content_lower or 'temp' in content_lower:
-                initial_type = 'heatwave'
+    # ULTIMATE UNWRAP: Handle payload dict or kwargs
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        try: payload = json.loads(payload)
+        except: payload = {}
 
-            incident_id = create_incident(
-                incident_type=initial_type,
-                severity="MEDIUM",
-                confidence=0.5,
-                location_name=location_name,
-                lat=signal['location'].latitude,
-                lng=signal['location'].longitude,
-                signal_source=signal['source_type']
-            )
-        elif incident_id and status == "verified":
-            # If incident exists, update its confidence and sources via create_incident logic
-            create_incident(
-                incident_type="unknown",
-                severity="MEDIUM",
-                confidence=0.5,
-                location_name=location_name,
-                lat=signal['location'].latitude,
-                lng=signal['location'].longitude,
-                signal_source=signal['source_type']
-            )
-        
-        # Update the signal in Firestore
-        verify_signal(signal['id'], credibility, status, incident_id)
-        
-        results.append({
-            "signal_id": signal['id'],
-            "status": status,
-            "incident_id": incident_id
-        })
+    data_list = payload.get("evaluations", [])
+    if isinstance(data_list, dict) and "evaluations" in data_list:
+        data_list = data_list["evaluations"]
+    
+    if not isinstance(data_list, (list, tuple)):
+        return "ERROR: Expected a list of evaluations."
 
+    for ev in data_list:
+        if not isinstance(ev, dict): continue
+        signal_id = ev.get('signal_id') or ev.get('id')
+        if not signal_id or signal_id in processed_signal_ids:
+            continue
+            
+        processed_signal_ids.add(signal_id)
+        incident_id = ev.get('incident_id')
+        status = ev.get('status', 'noise')
+        credibility = float(ev.get('credibility', 0.5))
+        
+        print(f"DEBUG: Processing evaluation for signal {signal_id} with status {status}")
+        
+        # If signal is verified
+        if status == 'verified':
+            # 1. CONFIDENCE BOOST: If incident exists, increment confidence
+            if incident_id and incident_id != "null":
+                print(f"DEBUG: Boosting confidence for existing incident {incident_id}")
+                inc_ref = db.collection("incidents").document(incident_id)
+                inc_doc = inc_ref.get()
+                if inc_doc.exists:
+                    current_conf = float(inc_doc.to_dict().get("confidence_score", 0.3))
+                    # Boost confidence: new_conf = current + (1 - current) * 0.4
+                    new_conf = round(min(0.99, current_conf + (1.0 - current_conf) * 0.4), 2)
+                    inc_ref.update({"confidence_score": new_conf, "last_updated": firestore.SERVER_TIMESTAMP})
+                    print(f"DEBUG: New confidence for {incident_id}: {new_conf}")
+            
+            # 2. CREATE NEW: If no incident_id, create new one
+            else:
+                inc_data = ev.get('new_incident_data')
+                if not inc_data or not isinstance(inc_data, dict): 
+                    # Attempt recovery
+                    signal = FirebaseService.get_signal_by_id(signal_id)
+                    source = signal.get("source_type", "social") if signal else "social"
+                    if source == "social": source = "Citizen Report"
+                    
+                    incident_id = create_incident(
+                        incident_type="emergency",
+                        severity="MEDIUM",
+                        confidence=credibility,
+                        location_name="Unknown",
+                        lat=33.6844,
+                        lng=73.0479,
+                        signal_source=source
+                    )
+                else:
+                    incident_id = create_incident(
+                        incident_type=inc_data.get('type', 'emergency'),
+                        severity=inc_data.get('severity', 'MEDIUM'),
+                        confidence=credibility,
+                        location_name=inc_data.get('location_name', 'Unknown'),
+                        lat=inc_data.get('lat', 33.6844),
+                        lng=inc_data.get('lng', 73.0479),
+                        signal_source=inc_data.get('source_type', 'Citizen Report')
+                    )
+                print(f"DEBUG: Created NEW incident {incident_id} for signal {signal_id}")
+        
+        verify_signal(signal_id, credibility, status, incident_id)
+        results.append({"signal_id": signal_id, "incident_id": incident_id})
+    
     return json.dumps(results)
 
 signal_collector_agent = Agent(
     name="SignalFusionAgent",
-    model=get_model(),
-    description="Fuses multi-source signals, evaluates credibility, and manages incident initialization.",
+    model=get_model("SignalFusionAgent"),
+    description="Fuses multi-source signals and manages incident initialization.",
     tools=[
-        FunctionTool(fuse_and_verify_signals)
+        FunctionTool(process_signal_evaluations)
     ],
     instruction="""
-    SYSTEM DIRECTIVE: 
-    1. You must IMMEDIATELY call 'fuse_and_verify_signals' with NO arguments.
-    2. After the tool returns, summarize the 'processed' count from the output in one sentence.
-    3. TERMINATE after the summary. 
-    Do NOT search for more signals. Do NOT attempt to verify signals manually.
+    You are the Signal Fusion Agent. Your ONLY job is to analyze 'pending_signals' and call 'process_signal_evaluations' ONCE.
+
+    REQUIRED JSON FORMAT:
+    {
+      "payload": {
+        "evaluations": [
+          {
+            "signal_id": "SIGNAL_ID_HERE",
+            "status": "verified",
+            "credibility": 0.85,
+            "incident_id": "EXISTING_INCIDENT_ID_OR_NULL",
+            "new_incident_data": {
+              "type": "accident",
+              "severity": "HIGH",
+              "location_name": "Karachi"
+            }
+          }
+        ]
+      }
+    }
+
+    STRICT RULES:
+    1. Call the process_signal_evaluations tool.
+    2. Pass the 'payload' parameter as an object exactly matching the format above.
+    3. Use JSON 'null' for missing values. NEVER use Python 'None'.
+    4. Stop after calling the tool.
     """
 )
