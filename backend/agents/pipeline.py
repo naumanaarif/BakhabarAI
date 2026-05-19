@@ -37,13 +37,16 @@ async def run_crisis_simulation(scenario_data: dict = None):
         
         # FILTER SIGNALS based on trigger mode (Strict Isolation)
         if trigger_type == "manual":
-            # For manual reports, only process the specific signal OR other manual signals
+            # For manual reports, we skip the Collector/Detector agents as the user has already defined the incident.
+            # We just mark the signal as processed and move to planning.
             target_id = scenario_data.get("target_signal_id") if scenario_data else None
             if target_id:
-                pending_signals = [s for s in all_pending if s['id'] == target_id]
-            else:
-                pending_signals = [s for s in all_pending if s.get('metadata', {}).get('trigger_type') == 'manual']
-            print(f"DEBUG: [ISOLATION] Manual mode. Processing {len(pending_signals)} manual signals.")
+                from services.firebase_service import FirebaseService
+                FirebaseService.update_signal_status(target_id, "processed")
+                print(f"DEBUG: [ISOLATION] Manual mode. Marked signal {target_id} as processed. Skipping Fusion/Detection.")
+            
+            # Skip to step 3
+            pending_signals = []
         else:
             # For stress tests, process everything tagged as mock or without a tag (legacy)
             pending_signals = [s for s in all_pending if s.get('metadata', {}).get('trigger_type') != 'manual']
@@ -76,7 +79,7 @@ async def run_crisis_simulation(scenario_data: dict = None):
             import asyncio
             await asyncio.sleep(2)
 
-        else:
+        elif trigger_type != "manual":
             print("DEBUG: No pending signals to process.")
             tracer.log("System", "No new signals to process.", {}, {})
     except Exception as e:
@@ -85,16 +88,19 @@ async def run_crisis_simulation(scenario_data: dict = None):
 
     # 2. Crisis Detection Stage
     try:
-        active_incidents = query_active_incidents()
-        if active_incidents:
-            print(f"DEBUG: Analyzing {len(active_incidents)} active incidents. Running DetectorAgent...")
-            clean_incidents = sanitize(active_incidents)
-            prompt = f"Analyze and classify the following active incidents to predict severity and evolution:\n{json.dumps(clean_incidents, default=str)}"
-            await run_agent_standalone(detector_agent, prompt)
-            import asyncio
-            await asyncio.sleep(2)
+        if trigger_type != "manual":
+            active_incidents = query_active_incidents()
+            if active_incidents:
+                print(f"DEBUG: Analyzing {len(active_incidents)} active incidents. Running DetectorAgent...")
+                clean_incidents = sanitize(active_incidents)
+                prompt = f"Analyze and classify the following active incidents to predict severity and evolution:\n{json.dumps(clean_incidents, default=str)}"
+                await run_agent_standalone(detector_agent, prompt)
+                import asyncio
+                await asyncio.sleep(2)
+            else:
+                print("DEBUG: No active incidents for DetectorAgent.")
         else:
-            print("DEBUG: No active incidents for DetectorAgent.")
+            print("DEBUG: Skipping DetectorAgent for manual report.")
     except Exception as e:
         tracer.log("System", "Degraded Mode: Crisis Detection failed.", {"error": str(e)}, {}, 0.0)
         print(f"CRITICAL: Crisis Detection Failure: {e}")

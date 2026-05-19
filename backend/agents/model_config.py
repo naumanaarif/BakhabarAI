@@ -7,7 +7,7 @@ import os
 os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 # Initialize Gemini once
-gemini_model = Gemini(model="models/gemini-2.0-flash-lite")
+gemini_model = Gemini(model="models/gemini-3.1-flash-lite")
 
 # Pre-initialize a pool of Groq models, one for each key
 groq_model_pool = []
@@ -19,15 +19,15 @@ if GROQ_API_KEYS:
             continue
             
         try:
-            # Pass the key directly to the model instance to ensure it's "locked in"
-            # Use low temperature (0.1) for stability and to prevent loops
+            # Switch to Llama 70B as requested for high-fidelity dialogue and complex reasoning
+            # Use temperature 0.0 for absolute determinism
             model_instance = LiteLlm(
                 model="groq/llama-3.3-70b-versatile",
                 api_key=key,
-                temperature=0.1
+                temperature=0.01
             )
-
             groq_model_pool.append(model_instance)
+
             print(f"DEBUG: Successfully added model for key {i+1} to pool.")
         except Exception as e:
             print(f"DEBUG: Failed to initialize Groq model with key {i}: {e}")

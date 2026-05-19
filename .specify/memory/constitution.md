@@ -45,7 +45,7 @@
 |---|---|---|
 | Agent orchestration | Google Antigravity | Mandatory — core requirement |
 | Agent framework | Google ADK (Agent Development Kit) | Primary agent framework |
-| LLM | Gemini 2.0 Flash / Gemini 2.5 Pro | Via Vertex AI |
+| LLM | Gemini 3.1 Flash / Llama 70B | Via Vertex AI / Groq |
 | Mobile app | Flutter (Dart) | Mandatory deliverable |
 | Backend API | Python (FastAPI or Flask) | Serves Flutter app |
 | Database | Firestore | Mock data storage |

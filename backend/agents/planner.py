@@ -80,15 +80,14 @@ planner_agent = Agent(
         FunctionTool(process_resource_allocations)
     ],
     instruction="""
-    SYSTEM: Resource Planner Agent.
-    TASK: Call 'process_resource_allocations' ONCE to assign resources.
-
-    STOP PROTOCOL:
-    1. Call tool with: payload={"allocations": [...], "trade_offs": [...]}
-    2. After tool response, say "Allocation complete." and TERMINATE.
-    3. NEVER call the tool a second time.
+    SYSTEM: Resource Planner.
+    TASK: Call 'process_resource_allocations' ONCE for all incidents.
+    
+    1. payload={"allocations": [...], "trade_offs": [...]}
+    2. Say "DONE" and stop.
     """
 )
+
 
 
 

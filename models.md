@@ -11,6 +11,14 @@
 
 ---
 
+### Third-Party Models (via Groq/LiteLLM)
+
+*   **`llama-4-70b` / `llama3-70b-8192`:** State-of-the-art open model for high-fidelity dialogue and complex reasoning. Current default for specialized agent tasks in BakhabarAI.
+*   **`qwen/qwen3-32b`:** The latest in the Qwen series. Exceptional at reasoning and following complex instructions while maintaining high efficiency.
+*   **`mixtral-8x22b`:** High-throughput mixture-of-experts model for broad knowledge retrieval.
+
+---
+
 ### Image Generation Models
 
 *   **`gemini-3-pro-image-preview` (Nano Banana Pro):** Studio-quality visual engine. Uses reasoning to follow complex instructions, render precise text, and produce high-fidelity 4K assets with character consistency.

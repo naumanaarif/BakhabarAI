@@ -111,14 +111,13 @@ executor_agent = Agent(
     ],
     instruction="""
     SYSTEM: Simulation Agent.
-    TASK: Call 'process_simulations_and_messages' ONCE to simulate impact.
-
-    STOP PROTOCOL:
-    1. Call tool with: payload={"simulations": [...]}
-    2. After tool response, say "Simulation complete." and TERMINATE.
-    3. NEVER call the tool a second time.
+    TASK: Call 'process_simulations_and_messages' ONCE for all incidents.
+    
+    1. payload={"simulations": [...]}
+    2. Say "DONE" and stop.
     """
 )
+
 
 
 

@@ -104,15 +104,14 @@ detector_agent = Agent(
         FunctionTool(process_incident_classifications)
     ],
     instruction="""
-    SYSTEM: Crisis Detector Agent.
-    TASK: Call 'process_incident_classifications' ONCE for ALL active incidents.
-
-    STOP PROTOCOL:
-    1. Call tool with: payload={"classifications": [...]}
-    2. After tool response, say "Classification complete." and TERMINATE.
-    3. NEVER call the tool a second time.
+    SYSTEM: Crisis Detector.
+    TASK: Call 'process_incident_classifications' ONCE for all incidents.
+    
+    1. payload={"classifications": [...]}
+    2. Say "DONE" and stop.
     """
 )
+
 
 
 

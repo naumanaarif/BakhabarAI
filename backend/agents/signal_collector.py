@@ -78,7 +78,7 @@ async def process_signal_evaluations(payload: Dict[str, Any] = None, **kwargs) -
         credibility = float(ev.get('credibility', 0.5))
         new_data = ev.get('new_incident_data')
 
-        print(f"DEBUG: Committing evaluation for signal {signal_id} with status {status}")
+        print(f"!!! [LOOP_BREAKER] Committing Signal Evaluation: {signal_id} -> {status} !!!")
         
         if status == 'verified':
             if incident_id and incident_id != "null" and incident_id != "None":
@@ -88,16 +88,14 @@ async def process_signal_evaluations(payload: Dict[str, Any] = None, **kwargs) -
                     current_conf = float(inc_doc.to_dict().get("confidence_score", 0.3))
                     new_conf = round(min(0.99, current_conf + (1.0 - current_conf) * 0.4), 2)
                     inc_ref.update({"confidence_score": new_conf, "last_updated": firestore.SERVER_TIMESTAMP})
+            elif new_data:
+                if hasattr(new_data, 'type'): inc_type, inc_sev, inc_loc = new_data.type, new_data.severity, new_data.location_name
+                elif isinstance(new_data, dict): inc_type, inc_sev, inc_loc = new_data.get('type', 'emergency'), new_data.get('severity', 'MEDIUM'), new_data.get('location_name', 'Unknown')
+                else: inc_type, inc_sev, inc_loc = 'emergency', 'MEDIUM', 'Unknown'
+                incident_id = create_incident(incident_type=inc_type, severity=inc_sev, confidence=credibility, location_name=inc_loc, lat=33.6844, lng=73.0479, signal_source="Citizen Report")
             else:
-                if not new_data: 
-                    signal = FirebaseService.get_signal_by_id(signal_id)
-                    source = signal.get("source_type", "social") if signal else "social"
-                    incident_id = create_incident(incident_type="emergency", severity="MEDIUM", confidence=credibility, location_name="Unknown", lat=33.6844, lng=73.0479, signal_source=source)
-                else:
-                    if hasattr(new_data, 'type'): inc_type, inc_sev, inc_loc = new_data.type, new_data.severity, new_data.location_name
-                    elif isinstance(new_data, dict): inc_type, inc_sev, inc_loc = new_data.get('type', 'emergency'), new_data.get('severity', 'MEDIUM'), new_data.get('location_name', 'Unknown')
-                    else: inc_type, inc_sev, inc_loc = 'emergency', 'MEDIUM', 'Unknown'
-                    incident_id = create_incident(incident_type=inc_type, severity=inc_sev, confidence=credibility, location_name=inc_loc, lat=33.6844, lng=73.0479, signal_source="Citizen Report")
+                print(f"DEBUG: Signal {signal_id} verified but no incident mapping or data provided. Skipping incident creation.")
+                status = 'noise' # Revert to noise if we can't do anything with it
         
         verify_signal(signal_id, credibility, status, incident_id)
         _ALREADY_PROCESSED_SIGNALS.add(signal_id)
@@ -106,7 +104,7 @@ async def process_signal_evaluations(payload: Dict[str, Any] = None, **kwargs) -
     return json.dumps({
         "status": "SUCCESS", 
         "terminal": True, 
-        "message": "DATA_LOCKED: All signals have been committed to permanent storage. DO NOT RETRY OR RE-EVALUATE.",
+        "message": "DATA_LOCKED_PERMANENTLY: ALL signals committed. DO NOT CALL AGAIN.",
         "processed": len(results)
     })
 
@@ -120,15 +118,13 @@ signal_collector_agent = Agent(
     ],
     instruction="""
     SYSTEM: Signal Fusion Agent.
-    TASK: Call 'process_signal_evaluations' ONCE for ALL pending signals.
+    TASK: Call 'process_signal_evaluations' ONCE for ALL signals.
     
-    STOP PROTOCOL:
-    1. Call tool with: payload={"evaluations": [...]}
-    2. ONLY use status: 'verified' or 'noise'.
-    3. After tool response, say "Processing complete." and TERMINATE.
-    4. NEVER call the tool a second time.
+    1. payload={"evaluations": [...]}
+    2. After calling, say "DONE" and stop.
     """
 )
+
 
 
 

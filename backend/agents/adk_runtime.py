@@ -113,7 +113,7 @@ async def run_agent_standalone(agent, input_text: str) -> str:
             
         return cleaned if cleaned else "Thinking..."
 
-    max_retries = 3
+    max_retries = 5
     retry_delay = 5 # seconds
     
     for attempt in range(max_retries):
@@ -130,13 +130,16 @@ async def run_agent_standalone(agent, input_text: str) -> str:
                 display_input = display_input[:147] + "..."
 
         user_action = f"Query: {display_input}" if input_text else "Initiated pipeline request"
-        tracer.log(
-            agent_name="User",
-            action=user_action,
-            input_data={"text": input_text[:500]}, # Store truncated raw text in input_data
-            output_data={},
-            confidence=1.0
-        )
+        
+        # Only log the user action on the first attempt to avoid UI clutter
+        if attempt == 0:
+            tracer.log(
+                agent_name="User",
+                action=user_action,
+                input_data={"text": input_text[:500]}, # Store truncated raw text in input_data
+                output_data={},
+                confidence=1.0
+            )
         
         # Add the input as the first and only event in this fresh session
         user_event = Event(
@@ -149,7 +152,7 @@ async def run_agent_standalone(agent, input_text: str) -> str:
         final_output = ""
         event_count = 0
         tool_call_count = 0
-        max_tool_calls = 5 # Safety valve for Llama loops
+        max_tool_calls = 3 # Ultra-strict for manual reports
         executed_tool_calls = set() # Prevent identical duplicate tool calls
         
         try:
