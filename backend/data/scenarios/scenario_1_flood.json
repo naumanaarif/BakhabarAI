@@ -1,75 +1,17 @@
 {
   "scenario_id": "flood_001",
-  "name": "Urban Monsoon Flood in Korangi",
-  "description": "Heavy monsoon rain causes severe urban flooding in Korangi Industrial Area and surrounding residential blocks. Nullahs overflow, vehicles stranded, industrial workers trapped.",
-  "city": "Karachi",
+  "name": "Urban Flood in G-10",
+  "description": "Heavy monsoon rain leading to urban flooding in G-10 sector.",
   "initial_signals": [
     {
       "signal_id": "weather_flood_001",
       "source_type": "weather",
       "source_name": "Google Weather API",
-      "timestamp": "2025-08-10T07:00:00Z",
-      "location": { "name": "Korangi, Karachi", "lat": 24.8269, "lng": 67.1244 },
-      "content": "Alert: Extreme monsoon rainfall detected — 72mm in last 3 hours. Flash flood warning issued for low-lying areas of Korangi and Landhi.",
+      "timestamp": "2024-01-15T14:00:00Z",
+      "location": { "name": "Islamabad", "lat": 33.6844, "lng": 73.0479 },
+      "content": "Alert: Extreme rainfall expected in next 2 hours (50mm+).",
       "credibility_score": 1.0,
       "is_mock": false
-    },
-    {
-      "signal_id": "social_flood_001",
-      "source_type": "social",
-      "source_name": "WhatsApp Report",
-      "timestamp": "2025-08-10T07:15:00Z",
-      "location": { "name": "Korangi No. 4, Karachi", "lat": 24.8310, "lng": 67.1280 },
-      "content": "Korangi No. 4 mein pani bhar gaya hai. Gaadiyaan phaas gayi hain, ghar mein paani aa gaya hai!",
-      "credibility_score": 0.75,
-      "is_mock": true
-    },
-    {
-      "signal_id": "social_flood_002",
-      "source_type": "social",
-      "source_name": "X (Twitter)",
-      "timestamp": "2025-08-10T07:20:00Z",
-      "location": { "name": "Korangi Industrial Area, Karachi", "lat": 24.8200, "lng": 67.1190 },
-      "content": "URGENT: Korangi Industrial Area completely submerged. Workers stranded inside factories. Nullah has overflowed onto main road. #KarachiFloods #Help",
-      "credibility_score": 0.70,
-      "is_mock": true
-    },
-    {
-      "signal_id": "sensor_flood_001",
-      "source_type": "sensor",
-      "source_name": "Drainage Sensor DS-Korangi-01",
-      "timestamp": "2025-08-10T07:05:00Z",
-      "location": { "name": "Korangi Nullah, Karachi", "lat": 24.8250, "lng": 67.1210 },
-      "content": "Water level: 3.8m (Critical threshold: 2.5m). Overflow imminent. Nullah capacity exceeded by 52%.",
-      "credibility_score": 1.0,
-      "is_mock": true
-    },
-    {
-      "signal_id": "ec_flood_001",
-      "source_type": "emergency_call",
-      "source_name": "1122 Rescue Dispatch",
-      "timestamp": "2025-08-10T07:30:00Z",
-      "location": { "name": "Korangi No. 4, Karachi", "lat": 24.8310, "lng": 67.1280 },
-      "content": "Caller: 'Hamaare ghar mein 3 feet paani aa gaya hai, bachche chhatt par hain, please jaldi aao!' Address: House B-47, Korangi No. 4.",
-      "credibility_score": 0.95,
-      "is_mock": true
-    },
-    {
-      "signal_id": "fr_flood_001",
-      "source_type": "field_report",
-      "source_name": "KMC Field Unit - Korangi",
-      "timestamp": "2025-08-10T07:50:00Z",
-      "location": { "name": "Korangi Industrial Road, Karachi", "lat": 24.8230, "lng": 67.1200 },
-      "content": "Confirmed: Korangi Industrial Road completely blocked. Water depth 4 feet at lowest point. Minimum 200 vehicles stranded. Rescue boats required urgently.",
-      "credibility_score": 0.98,
-      "is_mock": true
     }
-  ],
-  "expected_output": {
-    "crisis_type": "flood",
-    "severity": "HIGH",
-    "confidence_min": 0.88,
-    "affected_population_approx": 85000,
-    "expected_duration_hours": 8
-  }
+  ]
 }

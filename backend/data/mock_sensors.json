@@ -2,50 +2,10 @@
   {
     "signal_id": "sn_001",
     "source_type": "sensor",
-    "source_name": "Drainage Sensor DS-Korangi-01",
-    "timestamp": "2025-08-10T07:05:00Z",
-    "location": { "name": "Korangi Nullah, Karachi", "lat": 24.8250, "lng": 67.1210 },
-    "content": "Water level: 3.8m (Critical threshold: 2.5m). Overflow imminent. Nullah capacity exceeded by 52%.",
-    "credibility_score": 1.0,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sn_002",
-    "source_type": "sensor",
-    "source_name": "Drainage Sensor DS-Landhi-03",
-    "timestamp": "2025-08-10T07:10:00Z",
-    "location": { "name": "Landhi Industrial Area, Karachi", "lat": 24.8400, "lng": 67.1500 },
-    "content": "Water level: 2.9m (Critical threshold: 2.5m). Overflow detected. Drainage pump P-03 offline.",
-    "credibility_score": 1.0,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sn_003",
-    "source_type": "sensor",
-    "source_name": "Air Quality Sensor AQ-Orangi-02",
-    "timestamp": "2025-06-20T11:00:00Z",
-    "location": { "name": "Orangi Town, Karachi", "lat": 24.9480, "lng": 66.9950 },
-    "content": "Temperature: 47.2°C | Humidity: 22% | Heat Index: 52.1°C | UV Index: 11 (Extreme) | AQI: 178 (Unhealthy). Dangerous outdoor conditions detected.",
-    "credibility_score": 1.0,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sn_004",
-    "source_type": "sensor",
-    "source_name": "Traffic Sensor CAM-M9-KM32",
-    "timestamp": "2025-06-20T11:48:00Z",
-    "location": { "name": "M-9 Motorway KM-32, Karachi", "lat": 24.8910, "lng": 67.2710 },
-    "content": "Traffic flow: 0 vehicles/min (complete blockage). Incident detected at 11:46 PST. Emergency vehicle access corridor required.",
-    "credibility_score": 1.0,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sn_005",
-    "source_type": "sensor",
-    "source_name": "Gas Pressure Sensor GPS-Clifton-09",
-    "timestamp": "2025-03-15T16:20:00Z",
-    "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8085, "lng": 67.0328 },
-    "content": "Gas pressure: NORMAL (4.2 PSI — within operating range). No pressure drop detected. No leak signature. SSGC network nominal.",
+    "source_name": "Drainage Sensor DS-10",
+    "timestamp": "2024-01-15T14:25:00Z",
+    "location": { "name": "G-10 Main Nullah", "lat": 33.6820, "lng": 73.0450 },
+    "content": "Water level: 2.5m (Critical threshold 2.0m)",
     "credibility_score": 1.0,
     "is_mock": true
   }

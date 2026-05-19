@@ -3,60 +3,20 @@
     "signal_id": "sp_001",
     "source_type": "social",
     "source_name": "WhatsApp Report",
-    "timestamp": "2025-08-10T07:15:00Z",
-    "location": { "name": "Korangi No. 4, Karachi", "lat": 24.8310, "lng": 67.1280 },
-    "content": "Korangi No. 4 mein pani bhar gaya hai. Gaadiyaan phaas gayi hain, ghar mein paani aa gaya hai!",
-    "credibility_score": 0.75,
+    "timestamp": "2024-01-15T14:30:00Z",
+    "location": { "name": "G-10, Islamabad", "lat": 33.6844, "lng": 73.0479 },
+    "content": "G-10 mein pani bhar gaya hai, gaariyan phans gayi hain",
+    "credibility_score": 0.7,
     "is_mock": true
   },
   {
     "signal_id": "sp_002",
     "source_type": "social",
     "source_name": "X (Twitter)",
-    "timestamp": "2025-08-10T07:20:00Z",
-    "location": { "name": "Korangi Industrial Area, Karachi", "lat": 24.8200, "lng": 67.1190 },
-    "content": "URGENT: Korangi Industrial Area completely submerged. Workers stranded inside factories. Nullah overflowed onto main road. #KarachiFloods",
-    "credibility_score": 0.70,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sp_003",
-    "source_type": "social",
-    "source_name": "WhatsApp Report",
-    "timestamp": "2025-06-20T11:20:00Z",
-    "location": { "name": "Orangi Town, Karachi", "lat": 24.9500, "lng": 66.9970 },
-    "content": "Orangi Town mein aaj garmi se 7 log behosh hogaye hain. Abbas Town ke paas ek budha mara bhi. Hospital mein jagah nahi. #Karachi #LU",
-    "credibility_score": 0.72,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sp_004",
-    "source_type": "social",
-    "source_name": "X (Twitter)",
-    "timestamp": "2025-06-20T11:45:00Z",
-    "location": { "name": "M-9 Motorway, Karachi", "lat": 24.8900, "lng": 67.2700 },
-    "content": "BREAKING: Massive pile-up on M-9 Motorway near Toll Plaza — 3 trucks and 6 cars. Road completely blocked. Multiple injured. #KarachiAccident #M9",
-    "credibility_score": 0.78,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sp_005",
-    "source_type": "social",
-    "source_name": "X (Twitter)",
-    "timestamp": "2025-03-15T16:00:00Z",
-    "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8085, "lng": 67.0328 },
-    "content": "HUGE BLAST in Clifton Block 9 near Boat Basin!! Gas cylinder explosion. Black smoke visible from far. Run! #KarachiBlast #Clifton",
-    "credibility_score": 0.38,
-    "is_mock": true
-  },
-  {
-    "signal_id": "sp_006",
-    "source_type": "social",
-    "source_name": "Facebook Group: Karachi Citizens",
-    "timestamp": "2025-03-15T16:08:00Z",
-    "location": { "name": "Clifton, Karachi", "lat": 24.8100, "lng": 67.0350 },
-    "content": "Unverified: Reports of explosion near Boat Basin. No official confirmation yet. Please avoid area and stay calm.",
-    "credibility_score": 0.45,
+    "timestamp": "2024-01-15T14:35:00Z",
+    "location": { "name": "F-10 Markaz, Islamabad", "lat": 33.6934, "lng": 73.0119 },
+    "content": "Heavy traffic jam near F-10 due to water logging on roads.",
+    "credibility_score": 0.65,
     "is_mock": true
   }
 ]
