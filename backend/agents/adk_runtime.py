@@ -1,253 +1,259 @@
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.agents.run_config import RunConfig
-from google.adk.sessions.session import Session
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.events.event import Event
 from google.adk.utils.context_utils import Aclosing
-from typing import AsyncGenerator
 import uuid
 import os
+import json
+import asyncio
+import time
+
+# Import tracer at module level so it is always available
+from tracer import tracer
+
 
 async def create_root_context(agent) -> InvocationContext:
-    """
-    Creates a root invocation context for running an agent standalone.
-    """
+    """Creates a fresh invocation context for a single agent run."""
     session_service = InMemorySessionService()
     session_id = str(uuid.uuid4())
     app_name = "BakhabarAI"
     user_id = "anonymous"
-    
+
     session = await session_service.get_session(
-        app_name=app_name,
-        user_id=user_id,
-        session_id=session_id
+        app_name=app_name, user_id=user_id, session_id=session_id
     )
     if not session:
         session = await session_service.create_session(
-            app_name=app_name,
-            user_id=user_id,
-            session_id=session_id
+            app_name=app_name, user_id=user_id, session_id=session_id
         )
-    
-    # Minimal InvocationContext setup
+
     ctx = InvocationContext(
         invocation_id=str(uuid.uuid4()),
         session_service=session_service,
         session=session,
         agent=agent,
         branch="main",
-        run_config=RunConfig()
+        run_config=RunConfig(),
     )
     return ctx
 
+
+def _clean_event_text(text: str) -> str:
+    """Returns a human-readable summary of the agent event text."""
+    import re
+    text = text.strip()
+    if not text:
+        return ""
+    if text.startswith("{") or "```json" in text:
+        try:
+            js = text.split("```json")[1].split("```")[0].strip() if "```json" in text else text
+            data = json.loads(js)
+            if isinstance(data, dict):
+                for key in ("summary", "message", "description", "status", "report"):
+                    if key in data and isinstance(data[key], str) and len(data[key]) > 2:
+                        return data[key][:200]
+                if "evaluations" in data:
+                    return f"Evaluated {len(data['evaluations'])} signals."
+                if "classifications" in data:
+                    return f"Classified {len(data['classifications'])} incidents."
+            return "Committed structured data to database."
+        except Exception:
+            pass
+    cleaned = re.sub(r"[\*\#_`\-]", "", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:200] if cleaned else "Processing…"
+
+
+async def _consume_agent_events(agent, ctx) -> str:
+    """
+    Streams events from a running agent until a terminal condition or tool cap.
+    - Breaks immediately after the FIRST tool response (all our tools are single-call).
+    - Caps at MAX_EVENTS total events to prevent infinite loops on text-only LLM replies.
+    Returns final text output.
+    """
+    out = ""
+    tool_count = 0
+    MAX_TOOLS = 3
+    MAX_EVENTS = 30           # Hard cap — prevents infinite event streams
+    MAX_TEXT_ONLY = 6         # Break if LLM keeps chatting without calling a tool
+    event_count = 0
+    text_only_events = 0
+    seen_hashes: set = set()
+    got_tool_response = False
+
+    print(f"[ADK] ▶ Starting event stream for: {agent.name}")
+
+    async with Aclosing(agent.run_async(ctx)) as agen:
+        try:
+            async for event in agen:
+                event_count += 1
+                if event.author == "user":
+                    continue
+
+                event_text = ""
+                tool_info = []
+                terminal = False
+                has_tool_part = False
+
+                if hasattr(event, "content") and event.content and hasattr(event.content, "parts"):
+                    for part in event.content.parts:
+                        if hasattr(part, "call") and part.call:
+                            h = f"{part.call.name}:{json.dumps(part.call.args, sort_keys=True, default=str)}"
+                            if h not in seen_hashes:
+                                seen_hashes.add(h)
+                                tool_count += 1
+                                has_tool_part = True
+                                tool_info.append(f"Calling: {part.call.name}")
+                                print(f"[ADK]   🔧 [{agent.name}] Tool call #{tool_count}: {part.call.name}")
+                        elif hasattr(part, "response") and part.response:
+                            got_tool_response = True
+                            terminal = True
+                            has_tool_part = True
+                            tool_info.append(f"Completed: {part.response.name}")
+                            print(f"[ADK]   ✅ [{agent.name}] Tool response received: {part.response.name}")
+                        elif hasattr(part, "text") and part.text:
+                            event_text += part.text
+                            out += part.text
+                            print(f"[ADK]   💬 [{agent.name}] Text event #{event_count}: {part.text[:120].strip()!r}")
+
+                if not has_tool_part and event_text:
+                    text_only_events += 1
+                    print(f"[ADK]   📝 [{agent.name}] Text-only event {text_only_events}/{MAX_TEXT_ONLY}")
+
+                # Build a meaningful, concise tracer entry
+                action = _clean_event_text(event_text)
+                if not action and tool_info:
+                    action = " | ".join(tool_info)
+                if terminal or got_tool_response:
+                    action = "Task complete -- results committed to database."
+                if not action:
+                    action = "AI reasoning..."
+
+                # Always log
+                try:
+                    tracer.log(
+                        agent_name=event.author,
+                        action=action,
+                        input_data={"tools": tool_info},
+                        output_data={},
+                        confidence=1.0,
+                    )
+                except Exception as log_err:
+                    print(f"[ADK] Tracer write error: {log_err}")
+
+                # ── Exit conditions ─────────────────────────────────────────
+                if got_tool_response:
+                    print(f"[ADK] ✔ [{agent.name}] Tool response received — exiting stream.")
+                    break
+                if tool_count >= MAX_TOOLS:
+                    print(f"[ADK] ⚠ [{agent.name}] Tool cap reached ({MAX_TOOLS}) — exiting stream.")
+                    break
+                if text_only_events >= MAX_TEXT_ONLY:
+                    print(f"[ADK] ⚠ [{agent.name}] Text-only cap reached ({MAX_TEXT_ONLY}) — LLM not calling tools, exiting.")
+                    tracer.log(agent_name=agent.name, action="Warning: Agent produced text without calling tool — forcing exit.", input_data={}, output_data={}, confidence=0.5)
+                    break
+                if event_count >= MAX_EVENTS:
+                    print(f"[ADK] ⚠ [{agent.name}] Max event cap reached ({MAX_EVENTS}) — forcing exit.")
+                    tracer.log(agent_name=agent.name, action="Warning: Max event limit hit — forced exit.", input_data={}, output_data={}, confidence=0.5)
+                    break
+
+        except asyncio.CancelledError:
+            print(f"[ADK] ❌ [{agent.name}] Cancelled inside event loop.")
+
+    print(f"[ADK] ◀ Stream ended for {agent.name}: events={event_count}, tools={tool_count}, tool_response={got_tool_response}")
+    return out
+
+
 async def run_agent_standalone(agent, input_text: str) -> str:
     """
-    Runs an agent standalone and returns the final response.
-    Includes retry logic for RateLimitErrors.
+    Runs a single ADK agent, with retry + Gemini fallback on rate limits.
+    All agent events are logged to the global tracer for the /api/logs endpoint.
     """
     from google.genai import types
-    from tracer import tracer
-    from google.cloud.firestore_v1 import GeoPoint
-    import time
-    import litellm
-    import asyncio
 
-    # Enable debug if env var is set
-    if os.getenv("LITELLM_DEBUG", "False").lower() == "true":
-        litellm._turn_on_debug()
-
-    def sanitize_for_json(obj):
-        """Recursively converts non-JSON serializable objects (like GeoPoint) to dicts."""
-        if isinstance(obj, dict):
-            return {k: sanitize_for_json(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [sanitize_for_json(item) for item in obj]
-        elif isinstance(obj, GeoPoint):
-            return {"lat": obj.latitude, "lng": obj.longitude}
-        return obj
-    
-    print(f"DEBUG: Starting standalone run for agent: {agent.name}")
+    print(f"[ADK] >> Running: {agent.name}")
     from .model_config import set_key_for_agent
     set_key_for_agent(agent.name)
 
-    def clean_event_text(text: str) -> str:
-        import json
-        import re
-        text = text.strip()
-        if not text:
-            return ""
-            
-        # If it looks like raw JSON or contains a JSON block
-        if text.startswith("{") or "```json" in text:
-            try:
-                # Extract from code block if present
-                json_str = text
-                if "```json" in text:
-                    json_str = text.split("```json")[1].split("```")[0].strip()
-                
-                data = json.loads(json_str)
-                if isinstance(data, dict):
-                    # Prioritize human-readable fields
-                    for key in ["summary", "description", "message", "status", "report", "crisis_type", "action_type"]:
-                        if key in data and isinstance(data[key], str) and len(data[key]) > 2:
-                            return data[key]
-                    # If it's an evaluations list (SignalFusion)
-                    if "evaluations" in data:
-                        return f"Evaluated {len(data['evaluations'])} emergency signals."
-                    # If it's a classifications list (Detector)
-                    if "classifications" in data:
-                        return f"Classified {len(data['classifications'])} active incidents."
-                return "Processed structured data and committed to database."
-            except:
-                pass
+    MAX_RETRIES = 3
+    retry_delay = 8   # Start with 8s to give Gemini quota time to reset
 
-        # If it's just plain text, clean it up
-        cleaned = re.sub(r'[\*\#_`\-]', '', text)
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-        
-        # If still too long or looks like code/JSON, summarize
-        if "{" in cleaned or len(cleaned) > 200:
-            if len(cleaned) > 197:
-                return cleaned[:197] + "..."
-            return cleaned
-            
-        return cleaned if cleaned else "Thinking..."
+    for attempt in range(MAX_RETRIES):
+        from .model_config import get_model
+        agent.model = get_model(agent.name, force_gemini=(attempt >= 2))
 
-    max_retries = 5
-    retry_delay = 5 # seconds
-    
-    for attempt in range(max_retries):
-        start_run = time.time()
         ctx = await create_root_context(agent)
-        
-        # Log the user input to tracer for UI (Summarized to avoid JSON clutter)
-        display_input = input_text
-        if len(display_input) > 150:
-            # If it's a prompt with JSON, just show the core request
-            if "pending signals" in display_input.lower():
-                display_input = "Analyzing pending signals and active incidents for autonomous response..."
-            else:
-                display_input = display_input[:147] + "..."
 
-        user_action = f"Query: {display_input}" if input_text else "Initiated pipeline request"
-        
-        # Only log the user action on the first attempt to avoid UI clutter
         if attempt == 0:
+            display = input_text[:117] + "..." if len(input_text) > 120 else input_text
             tracer.log(
-                agent_name="User",
-                action=user_action,
-                input_data={"text": input_text[:500]}, # Store truncated raw text in input_data
+                agent_name=agent.name,
+                action=f"Starting task: {display}",
+                input_data={},
                 output_data={},
-                confidence=1.0
+                confidence=1.0,
             )
-        
-        # Add the input as the first and only event in this fresh session
+
         user_event = Event(
             author="user",
             content=types.Content(role="user", parts=[types.Part(text=input_text)]),
-            invocation_id=ctx.invocation_id
+            invocation_id=ctx.invocation_id,
         )
         await ctx.session_service.append_event(ctx.session, user_event)
-        
-        final_output = ""
-        event_count = 0
-        tool_call_count = 0
-        max_tool_calls = 3 # Ultra-strict for manual reports
-        executed_tool_calls = set() # Prevent identical duplicate tool calls
-        
+
+        t0 = time.time()
         try:
-            # Pass only the context to run_async
-            async with Aclosing(agent.run_async(ctx)) as agen:
-                async for event in agen:
-                    event_count += 1
-                    elapsed = time.time() - start_run
-                    
-                    if tool_call_count >= max_tool_calls:
-                        print(f"CRITICAL: Agent {agent.name} exceeded max tool calls ({max_tool_calls}). Force-breaking generator.")
-                        # Force close the generator to stop ADK internals
-                        await agen.aclose()
-                        break
-
-                    if event.author != "user":
-                        # Capture tool calls
-                        tool_calls = []
-                        event_text = ""
-                        has_terminal_response = False
-
-                        if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-                            for part in event.content.parts:
-                                if tool_call_count >= max_tool_calls:
-                                    print(f"CRITICAL: Agent {agent.name} exceeded max tool calls ({max_tool_calls}). Force-breaking part loop.")
-                                    has_terminal_response = True
-                                    break
-
-                                if hasattr(part, 'call') and part.call:
-                                    tool_call_count += 1
-                                    call_hash = f"{part.call.name}:{json.dumps(part.call.args, sort_keys=True)}"
-                                    if call_hash in executed_tool_calls:
-                                        print(f"DEBUG: Skipping identical duplicate tool call: {part.call.name}")
-                                        continue
-                                    executed_tool_calls.add(call_hash)
-                                    tool_calls.append({"tool": part.call.name, "args": part.call.args})
-                                
-                                elif hasattr(part, 'response') and part.response:
-                                    res_str = str(part.response.result)
-                                    if '"terminal": true' in res_str.lower() or '"DATA_LOCKED"' in res_str:
-                                        has_terminal_response = True
-                                    tool_calls.append({"tool_response": part.response.name, "result": part.response.result})
-                                
-                                elif hasattr(part, 'text') and part.text:
-                                    event_text += part.text
-                            
-                            if tool_call_count >= max_tool_calls:
-                                break
-
-                        # Normal logging logic...
-                        try:
-                            action_desc = clean_event_text(event_text)
-                            if has_terminal_response:
-                                action_desc = "Task finalized. Committing results to dashboard."
-                            
-                            if not action_desc:
-                                # (existing fallback logic)
-                                if tool_calls:
-                                    actions = []
-                                    for tc in tool_calls:
-                                        if "tool" in tc: actions.append(f"Running task: {tc['tool'].replace('_', ' ').title()}")
-                                        if "tool_response" in tc: actions.append(f"Completed: {tc['tool_response'].replace('_', ' ').title()}")
-                                    action_desc = " | ".join(actions)
-                            
-                            tracer.log(agent_name=event.author, action=action_desc or "AI processing", input_data={"tool_calls": tool_calls}, output_data=sanitize_for_json(event.model_dump()), confidence=1.0)
-                        except Exception as e:
-                            print(f"DEBUG: Error logging: {e}")
-
-                        # If we just received a terminal tool response, we can break early if the model keeps talking
-                        if has_terminal_response and tool_call_count >= 1:
-                            print(f"DEBUG: Received terminal response from tool. Preparing to close agent {agent.name}.")
-                            # We don't break immediately to allow the model to say "Processing complete"
-                    
-                    if hasattr(event, 'content') and event.content:
-                        if hasattr(event.content, 'parts'):
-                            for part in event.content.parts:
-                                if hasattr(part, 'text') and part.text:
-                                    final_output += part.text
-            
-            # If we reached here without exception, break the retry loop
-            total_time = time.time() - start_run
-            print(f"DEBUG: Pipeline finished in {total_time:.1f}s with {event_count} events.")
+            final_output = await asyncio.wait_for(
+                _consume_agent_events(agent, ctx),
+                timeout=60.0,
+            )
+            elapsed = time.time() - t0
+            print(f"[ADK] OK {agent.name} finished in {elapsed:.1f}s (attempt {attempt + 1})")
+            tracer.log(
+                agent_name=agent.name,
+                action=f"Agent completed in {elapsed:.1f}s.",
+                input_data={},
+                output_data={},
+                confidence=1.0,
+            )
             return final_output
 
-        except Exception as e:
-            error_str = str(e)
-            if "rate_limit" in error_str.lower() or "429" in error_str:
-                print(f"DEBUG: Rate limit hit on attempt {attempt + 1}. Rotating key and retrying in {retry_delay}s...")
+        except asyncio.TimeoutError:
+            print(f"[ADK] TIMEOUT {agent.name} (attempt {attempt + 1})")
+            tracer.log(agent_name=agent.name, action=f"Timeout on attempt {attempt + 1} -- retrying...", input_data={}, output_data={}, confidence=0.3)
+            if attempt < MAX_RETRIES - 1:
                 from .model_config import rotate_groq_key
-                rotate_groq_key()
+                rotate_groq_key(agent.name)
                 await asyncio.sleep(retry_delay)
-                # Exponential backoff for next time
-                retry_delay *= 2
+                retry_delay = min(retry_delay * 2, 30)
+                continue
+            raise Exception(f"{agent.name} timed out after {MAX_RETRIES} attempts.")
+
+        except asyncio.CancelledError:
+            print(f"[ADK] CANCELLED {agent.name} (attempt {attempt + 1})")
+            tracer.log(agent_name=agent.name, action=f"Cancelled on attempt {attempt + 1} -- retrying...", input_data={}, output_data={}, confidence=0.3)
+            if attempt < MAX_RETRIES - 1:
+                from .model_config import rotate_groq_key
+                rotate_groq_key(agent.name)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 30)
+                continue
+            raise Exception(f"{agent.name} repeatedly cancelled.")
+
+        except Exception as e:
+            err = str(e)
+            is_rate_limit = "rate_limit" in err.lower() or "429" in err or "quota" in err.lower()
+            if is_rate_limit:
+                print(f"[ADK] RATE LIMIT on attempt {attempt + 1}. Waiting {retry_delay}s...")
+                tracer.log(agent_name=agent.name, action=f"Rate limit -- rotating key, waiting {retry_delay}s", input_data={}, output_data={}, confidence=0.2)
+                from .model_config import rotate_groq_key
+                rotate_groq_key(agent.name)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
             else:
-                print(f"DEBUG: Exception during agent.run_async: {e}")
-                raise e
-    
-    raise Exception(f"Failed to run agent {agent.name} after {max_retries} attempts due to Rate Limits.")
+                print(f"[ADK] ❌ ERROR in {agent.name} (attempt {attempt+1}): {type(e).__name__}: {e}")
+                tracer.log(agent_name=agent.name, action=f"Error ({type(e).__name__}): {str(e)[:200]}", input_data={}, output_data={}, confidence=0.0)
+                raise
+
+    raise Exception(f"{agent.name} failed after {MAX_RETRIES} attempts.")

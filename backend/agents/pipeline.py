@@ -3,23 +3,30 @@ from google.adk.tools import FunctionTool
 from .adk_runtime import run_agent_standalone
 from .model_config import get_model
 
+# Import tracer at module level — same singleton used by adk_runtime
+from tracer import tracer
+
+
 async def run_crisis_simulation(scenario_data: dict = None):
     """
-    Orchestrates the crisis response pipeline using Google ADK agents.
-    Provides robustness via 'Degraded Mode' fallbacks for each stage.
+    Orchestrates the 5-stage crisis response pipeline using Google ADK agents.
+    Every stage logs to the tracer so /api/logs always reflects pipeline activity.
     """
     from tools.firebase_tools import get_pending_signals, query_active_incidents, get_resources
-    from .adk_runtime import run_agent_standalone
     from agents.signal_collector import signal_collector_agent
     from agents.detector import detector_agent
     from agents.planner import planner_agent
     from agents.executor import executor_agent
-    from tracer import tracer
     from google.cloud.firestore_v1 import GeoPoint
     import json
+    import asyncio
+
+    trigger_type = (scenario_data or {}).get("trigger_type", "manual")
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
     def sanitize(obj):
-        """Recursively converts GeoPoints to dicts for AI prompts."""
+        """Recursively converts GeoPoints to plain dicts."""
         if isinstance(obj, list):
             return [sanitize(i) for i in obj]
         if isinstance(obj, dict):
@@ -28,153 +35,261 @@ async def run_crisis_simulation(scenario_data: dict = None):
             return {"lat": obj.latitude, "lng": obj.longitude}
         return obj
 
-    print("🚀 [PIPELINE] Starting Crisis Simulation...")
+    def slim_signal(sig):
+        return {
+            "id":  sig.get("id", ""),
+            "src": sig.get("source_type", ""),
+            "msg": str(sig.get("content", ""))[:100],
+        }
 
-    # 1. Signal Fusion Stage
-    try:
-        trigger_type = scenario_data.get("trigger_type", "manual") if scenario_data else "manual"
-        all_pending = get_pending_signals()
-        
-        # FILTER SIGNALS based on trigger mode (Strict Isolation)
-        if trigger_type == "manual":
-            # For manual reports, we skip the Collector/Detector agents as the user has already defined the incident.
-            # We just mark the signal as processed and move to planning.
-            target_id = scenario_data.get("target_signal_id") if scenario_data else None
-            if target_id:
-                from services.firebase_service import FirebaseService
-                FirebaseService.update_signal_status(target_id, "processed")
-                print(f"DEBUG: [ISOLATION] Manual mode. Marked signal {target_id} as processed. Skipping Fusion/Detection.")
-            
-            # Skip to step 3
-            pending_signals = []
-        else:
-            # For stress tests, process everything tagged as mock or without a tag (legacy)
-            pending_signals = [s for s in all_pending if s.get('metadata', {}).get('trigger_type') != 'manual']
-            
-            # INJECT additional mock signals if provided
-            if scenario_data and "mock_signals" in scenario_data:
-                print(f"DEBUG: Injecting {len(scenario_data['mock_signals'])} additional mock signals.")
-                pending_signals.extend(scenario_data["mock_signals"])
-            
-            print(f"DEBUG: [ISOLATION] Mock/Stress mode. Processing {len(pending_signals)} signals.")
-            
-        active_incidents = query_active_incidents()
-        if pending_signals:
-            print(f"DEBUG: Running SignalFusionAgent for {len(pending_signals)} isolated signals...")
+    def slim_incident(inc, mode="base"):
+        obj = {
+            "id":   inc.get("id", ""),
+            "type": inc.get("type", ""),
+            "sev":  inc.get("severity", ""),
+            "loc":  inc.get("location_name", ""),
+        }
+        if mode == "detector":
+            obj["conf"] = inc.get("confidence_score", 0)
+        if mode == "planner":
+            obj["pop"] = inc.get("affected_population", 0)
+            obj["hrs"] = inc.get("expected_duration_hours", 0)
+        if mode == "executor":
+            obj["res"] = inc.get("assigned_resources", [])[:3]
+            obj["pop"] = inc.get("affected_population", 0)
+        return obj
 
-            # Sanitize for prompt
-            clean_signals = sanitize(pending_signals)
-            clean_incidents = sanitize(active_incidents)
+    def slim_resource(res):
+        return {
+            "id":   res.get("id", ""),
+            "type": res.get("type") or res.get("resource_type", ""),
+            "ok":   res.get("status", "") == "available",
+        }
 
-            prompt = f"Process the following pending signals and active incidents:\nSignals: {json.dumps(clean_signals, default=str)}\nIncidents: {json.dumps(clean_incidents, default=str)}"
-            await run_agent_standalone(signal_collector_agent, prompt)
+    # ── Pipeline start ────────────────────────────────────────────────────────
+    tracer.log(
+        agent_name="System",
+        action=f"🚀 Pipeline started — trigger: {trigger_type}",
+        input_data={"trigger": trigger_type, "scenario": str(scenario_data or {})[:150]},
+        output_data={},
+        confidence=1.0,
+    )
+    print("\n" + "="*60)
+    print(f"🚀 [PIPELINE] Starting | trigger: {trigger_type}")
+    print("="*60)
 
-            # Mark as fully processed after success
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 1 — Signal Fusion
+    # ══════════════════════════════════════════════════════════════════════════
+    print("\n" + "-"*60)
+    print("[STAGE 1] Signal Fusion")
+    print("-"*60)
+    tracer.log("SignalFusionAgent", "Stage 1: Signal Fusion starting…", {}, {}, 1.0)
+    if trigger_type == "manual":
+        target_id = (scenario_data or {}).get("target_signal_id")
+        if target_id:
             from services.firebase_service import FirebaseService
-            for s in pending_signals:
-                FirebaseService.update_signal_status(s['id'], "processed")
-            print("DEBUG: Marked all pending signals as processed.")
+            FirebaseService.update_signal_status(target_id, "processed")
+        tracer.log("SignalFusionAgent", "Manual report — skipping fusion (incident already created).", {}, {}, 1.0)
+        print("[STAGE 1] Manual mode — skipping fusion.")
+        pending_signals = []
+    else:
+        try:
+            all_pending = get_pending_signals()
+            pending_signals = [
+                s for s in all_pending
+                if s.get("metadata", {}).get("trigger_type") != "manual"
+            ]
+            if scenario_data and "mock_signals" in scenario_data:
+                pending_signals.extend(scenario_data["mock_signals"])
 
-            # Small cooldown between agents to respect TPM limits
-            import asyncio
-            await asyncio.sleep(2)
+            if pending_signals:
+                tracer.log(
+                    "SignalFusionAgent",
+                    f"Fusing {len(pending_signals)} pending signals from {trigger_type} source.",
+                    {"count": len(pending_signals)}, {}, 1.0,
+                )
+                active_now = sanitize(query_active_incidents())
+                slim_inc_list = [slim_incident(i, "base") for i in active_now]
 
-        elif trigger_type != "manual":
-            print("DEBUG: No pending signals to process.")
-            tracer.log("System", "No new signals to process.", {}, {})
-    except Exception as e:
-        tracer.log("System", "Degraded Mode: Signal Fusion failed. Reverting to manual monitoring.", {"error": str(e)}, {}, 0.0)
-        print(f"CRITICAL: Signal Fusion Failure: {e}")
+                BATCH = 4
+                for i in range(0, len(pending_signals), BATCH):
+                    batch = pending_signals[i:i + BATCH]
+                    slimmed = [slim_signal(s) for s in batch]
+                    prompt = (
+                        "Fuse signals into incidents. Call process_signal_evaluations once.\n"
+                        f"signals={json.dumps(slimmed)}\n"
+                        f"active={json.dumps(slim_inc_list)}"
+                    )
+                    print(f"[STAGE 1] Batch {i // BATCH + 1} | {len(batch)} signals | {len(prompt)} chars")
+                    await run_agent_standalone(signal_collector_agent, prompt)
 
-    # 2. Crisis Detection Stage
-    try:
-        if trigger_type != "manual":
-            active_incidents = query_active_incidents()
-            if active_incidents:
-                print(f"DEBUG: Analyzing {len(active_incidents)} active incidents. Running DetectorAgent...")
-                clean_incidents = sanitize(active_incidents)
-                prompt = f"Analyze and classify the following active incidents to predict severity and evolution:\n{json.dumps(clean_incidents, default=str)}"
+                    from services.firebase_service import FirebaseService
+                    for s in batch:
+                        FirebaseService.update_signal_status(s["id"], "processed")
+
+                    if i + BATCH < len(pending_signals):
+                        print(f"[STAGE 1] Waiting 5s before next batch to avoid rate limits...")
+                        await asyncio.sleep(5)
+            else:
+                tracer.log("SignalFusionAgent", "No pending signals to fuse — skipping.", {}, {}, 1.0)
+                print("[STAGE 1] No pending signals.")
+        except Exception as e:
+            tracer.log("SignalFusionAgent", f"⚠ Signal Fusion failed (degraded mode): {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
+            print(f"[STAGE 1] FAILED: {e}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 2 — Crisis Detection
+    # ══════════════════════════════════════════════════════════════════════════
+    print("\n" + "-"*60)
+    print("[STAGE 2] Crisis Detection")
+    print("-"*60)
+    tracer.log("DetectorAgent", "Stage 2: Crisis Detection starting…", {}, {}, 1.0)
+    await asyncio.sleep(3)  # Inter-stage pause
+    if trigger_type != "manual":
+        try:
+            incidents = sanitize(query_active_incidents())
+            unclassified = [i for i in incidents if not i.get("affected_population")]
+            if unclassified:
+                tracer.log(
+                    "DetectorAgent",
+                    f"Classifying {len(unclassified)} unclassified incident(s).",
+                    {"count": len(unclassified)}, {}, 1.0,
+                )
+                slimmed = [slim_incident(i, "detector") for i in unclassified]
+                prompt = (
+                    "Classify each crisis. Call process_incident_classifications once.\n"
+                    f"incidents={json.dumps(slimmed)}"
+                )
+                print(f"[STAGE 2] Detecting {len(unclassified)} incidents | {len(prompt)} chars")
                 await run_agent_standalone(detector_agent, prompt)
-                import asyncio
                 await asyncio.sleep(2)
             else:
-                print("DEBUG: No active incidents for DetectorAgent.")
-        else:
-            print("DEBUG: Skipping DetectorAgent for manual report.")
-    except Exception as e:
-        tracer.log("System", "Degraded Mode: Crisis Detection failed.", {"error": str(e)}, {}, 0.0)
-        print(f"CRITICAL: Crisis Detection Failure: {e}")
+                tracer.log("DetectorAgent", "All incidents already classified — skipping.", {}, {}, 1.0)
+                print("[STAGE 2] All incidents already classified.")
+        except Exception as e:
+            tracer.log("DetectorAgent", f"⚠ Crisis Detection failed (degraded mode): {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
+            print(f"[STAGE 2] FAILED: {e}")
+    else:
+        tracer.log("DetectorAgent", "Manual report — skipping detection (type already known).", {}, {}, 1.0)
+        print("[STAGE 2] Skipped for manual report.")
 
-    # 3. Resource Planning Stage
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 3 — Resource Planning
+    # ══════════════════════════════════════════════════════════════════════════
+    print("\n" + "-"*60)
+    print("[STAGE 3] Resource Planning")
+    print("-"*60)
+    tracer.log("ResourcePlannerAgent", "Stage 3: Resource Planning starting…", {}, {}, 1.0)
+    await asyncio.sleep(3)  # Inter-stage pause
     try:
-        active_incidents = query_active_incidents()
-        available_resources = get_resources()
-        if active_incidents:
-            prompt = f"Optimize resource allocation for these incidents considering constraints:\nIncidents: {json.dumps(active_incidents, default=str)}\nResources: {json.dumps(available_resources, default=str)}"
+        incidents = sanitize(query_active_incidents())
+        unplanned = [i for i in incidents if not i.get("assigned_resources")]
+        resources = get_resources()
+        available = [r for r in resources if r.get("status") == "available"]
+
+        if unplanned and available:
+            tracer.log(
+                "ResourcePlannerAgent",
+                f"Allocating resources: {len(available)} available → {len(unplanned)} unplanned incident(s).",
+                {"incidents": len(unplanned), "resources": len(available)}, {}, 1.0,
+            )
+            slim_incs = [slim_incident(i, "planner") for i in unplanned]
+            slim_res = [slim_resource(r) for r in available[:10]]
+            prompt = (
+                "Allocate resources to incidents. Call process_resource_allocations once.\n"
+                f"incidents={json.dumps(slim_incs)}\n"
+                f"resources={json.dumps(slim_res)}"
+            )
+            print(f"[STAGE 3] Planning {len(unplanned)} incidents + {len(slim_res)} resources | {len(prompt)} chars")
             await run_agent_standalone(planner_agent, prompt)
-            import asyncio
             await asyncio.sleep(2)
+        else:
+            msg = "No available resources." if not available else "All incidents already have resources assigned."
+            tracer.log("ResourcePlannerAgent", f"Skipping planning — {msg}", {}, {}, 1.0)
+            print(f"[STAGE 3] Skipped: {msg}")
     except Exception as e:
-        tracer.log("System", "Degraded Mode: Resource Planning failed.", {"error": str(e)}, {}, 0.0)
-        print(f"CRITICAL: Resource Planning Failure: {e}")
+        tracer.log("ResourcePlannerAgent", f"⚠ Resource Planning failed (degraded mode): {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
+        print(f"[STAGE 3] FAILED: {e}")
 
-    # 4. Impact Simulation Stage
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 4 — Impact Simulation
+    # ══════════════════════════════════════════════════════════════════════════
+    print("\n" + "-"*60)
+    print("[STAGE 4] Impact Simulation")
+    print("-"*60)
+    tracer.log("SimulationStakeholderAgent", "Stage 4: Impact Simulation starting…", {}, {}, 1.0)
+    await asyncio.sleep(3)  # Inter-stage pause
     try:
-        active_incidents = query_active_incidents()
-        
-        # DEDUPING: Only simulate incidents that haven't been simulated in the last hour
         from firebase_config import db
         from google.cloud.firestore_v1 import FieldFilter
-        from datetime import datetime, timedelta
-        
-        sim_ready_incidents = []
-        for inc in active_incidents:
-            # Simple query by incident_id only to avoid needing a composite index
-            recent_sims = db.collection("action_simulations")\
-                .where(filter=FieldFilter("incident_id", "==", inc['id']))\
-                .limit(5).get()
-            
-            # Filter by timestamp in Python
+        from datetime import datetime
+
+        incidents = sanitize(query_active_incidents())
+        sim_ready = []
+        for inc in incidents:
+            recent = (
+                db.collection("action_simulations")
+                .where(filter=FieldFilter("incident_id", "==", inc["id"]))
+                .limit(3)
+                .get()
+            )
             has_recent = False
-            for doc in recent_sims:
-                sim_data = doc.to_dict()
-                if "timestamp" in sim_data:
-                    # Handle both datetime objects and ISO strings
-                    ts = sim_data["timestamp"]
-                    if isinstance(ts, str):
-                        try: ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                        except: ts = datetime.now() # Fallback
-                    
-                    if (datetime.now(ts.tzinfo) - ts).total_seconds() < 3600:
-                        has_recent = True
-                        break
-            
+            for doc in recent:
+                ts = doc.to_dict().get("timestamp")
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    except Exception:
+                        ts = datetime.now()
+                if ts and (datetime.now(ts.tzinfo) - ts).total_seconds() < 3600:
+                    has_recent = True
+                    break
             if not has_recent:
-                sim_ready_incidents.append(inc)
+                sim_ready.append(inc)
             else:
-                print(f"DEBUG: Skipping simulation for incident {inc['id']} (already simulated recently).")
-        
-        if sim_ready_incidents:
-            print(f"DEBUG: Running SimulationStakeholderAgent for {len(sim_ready_incidents)} incidents...")
-            prompt = f"Simulate response impact and generate stakeholder notifications for these incidents:\n{json.dumps(sanitize(sim_ready_incidents), default=str)}"
+                tracer.log("SimulationStakeholderAgent", f"Skipping {inc['id']} — simulation done within last hour.", {}, {}, 1.0)
+
+        if sim_ready:
+            tracer.log(
+                "SimulationStakeholderAgent",
+                f"Simulating impact for {len(sim_ready)} incident(s) and generating stakeholder messages.",
+                {"count": len(sim_ready)}, {}, 1.0,
+            )
+            slimmed = [slim_incident(i, "executor") for i in sim_ready]
+            prompt = (
+                "Simulate response impact and generate stakeholder notifications. "
+                "Call process_simulations_and_messages once.\n"
+                f"incidents={json.dumps(slimmed)}"
+            )
+            print(f"[STAGE 4] Simulating {len(sim_ready)} incidents | {len(prompt)} chars")
             await run_agent_standalone(executor_agent, prompt)
         else:
-            print("DEBUG: No incidents require fresh simulation.")
-            
+            tracer.log("SimulationStakeholderAgent", "All incidents simulated recently — skipping.", {}, {}, 1.0)
+            print("[STAGE 4] No incidents need fresh simulation.")
     except Exception as e:
-        tracer.log("System", "Degraded Mode: Impact Simulation failed.", {"error": str(e)}, {}, 0.0)
-        print(f"CRITICAL: Impact Simulation Failure: {e}")
+        tracer.log("SimulationStakeholderAgent", f"⚠ Impact Simulation failed (degraded mode): {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
+        print(f"[STAGE 4] FAILED: {e}")
 
-    # 5. Final Reporting Stage
+    # ══════════════════════════════════════════════════════════════════════════
+    # STAGE 5 — Final Report (pure Python, no LLM call)
+    # ══════════════════════════════════════════════════════════════════════════
     try:
-        from agents.reporter import reporter_agent
-        active_incidents = query_active_incidents()
-        if active_incidents:
-            print("DEBUG: Running ReporterAgent...")
-            prompt = f"Generate a final summary report for these active incidents:\n{json.dumps(sanitize(active_incidents), default=str)}"
-            await run_agent_standalone(reporter_agent, prompt)
+        incidents = sanitize(query_active_incidents())
+        high = sum(1 for i in incidents if i.get("severity") == "HIGH")
+        med  = sum(1 for i in incidents if i.get("severity") == "MEDIUM")
+        low  = sum(1 for i in incidents if i.get("severity") == "LOW")
+        summary = (
+            f"Pipeline complete ✅ — {len(incidents)} active incident(s) "
+            f"(HIGH={high}, MEDIUM={med}, LOW={low}). Trigger: {trigger_type}."
+        )
+        tracer.log("ReporterAgent", summary, {}, {"count": len(incidents), "high": high, "medium": med, "low": low}, 1.0)
+        print(f"[STAGE 5] {summary}")
     except Exception as e:
-        tracer.log("System", "Degraded Mode: Final Reporting failed.", {"error": str(e)}, {}, 0.0)
-        print(f"CRITICAL: Final Reporting Failure: {e}")
+        tracer.log("System", f"⚠ Final Reporting failed: {str(e)[:150]}", {"error": str(e)}, {}, 0.0)
+        print(f"[STAGE 5] FAILED: {e}")
 
+    print("\n" + "="*60)
+    print("[PIPELINE] ✅ Complete!")
+    print("="*60 + "\n")
     return "PIPELINE_COMPLETE"

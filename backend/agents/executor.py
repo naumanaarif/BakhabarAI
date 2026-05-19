@@ -61,11 +61,21 @@ async def process_simulations_and_messages(payload: Dict[str, Any] = None, **kwa
             continue
 
         # 2. DATABASE LOOP BREAKER
-        recent = db.collection("action_simulations").where(filter=FieldFilter("incident_id", "==", incident_id)).order_by("timestamp", direction="DESCENDING").limit(1).get()
+        recent = db.collection("action_simulations").where(filter=FieldFilter("incident_id", "==", incident_id)).limit(5).get()
         if recent:
-            ts = recent[0].to_dict().get("timestamp")
-            # If simulated in last 10 minutes, skip
-            if ts and (datetime.now(ts.tzinfo) - ts).total_seconds() < 600: 
+            # Check the timestamps in Python to avoid needing a composite index
+            has_recent = False
+            for doc in recent:
+                ts = doc.to_dict().get("timestamp")
+                if isinstance(ts, str):
+                    try: ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    except: ts = datetime.now()
+                    
+                if ts and (datetime.now(ts.tzinfo) - ts).total_seconds() < 600: 
+                    has_recent = True
+                    break
+                    
+            if has_recent:
                 print(f"DEBUG: Simulation for {incident_id} already exists. Skipping to break loop.")
                 _PROCESSED_SIMULATIONS.add(incident_id)
                 continue

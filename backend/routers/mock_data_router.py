@@ -172,9 +172,28 @@ async def run_scenario(scenario: dict = None):
 @router.get("/logs")
 async def get_logs():
     """Fetches recent agent traces from the tracer instance."""
+    traces = tracer.get_traces()
+    print(f"[API] /api/logs — returning {len(traces)} trace entries")
     return {
-        "traces": tracer.get_traces()
+        "count": len(traces),
+        "traces": traces
     }
+
+@router.get("/debug/ping")
+async def debug_ping():
+    """Health check + tracer state. Use this to verify server is alive."""
+    traces = tracer.get_traces()
+    return {
+        "status": "ok",
+        "tracer_entries": len(traces),
+        "last_trace": traces[-1] if traces else None
+    }
+
+@router.delete("/debug/logs")
+async def clear_logs():
+    """Clears in-memory tracer logs. Use before a fresh scenario run."""
+    tracer.clear()
+    return {"status": "cleared"}
 
 @router.get("/places/autocomplete")
 async def places_autocomplete(q: str):
