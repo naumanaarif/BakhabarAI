@@ -23,17 +23,25 @@ from tools.firebase_tools import query_active_incidents, update_incident_details
 from tracer import tracer
 from .model_config import get_model
 
-async def process_incident_classifications(classifications: List[Dict[str, Any]], **kwargs) -> str:
+async def process_incident_classifications(classifications: List[Dict[str, Any]] = None, **kwargs) -> str:
     """
     Commits your detailed crisis classification.
     """
-    if not classifications or not isinstance(classifications, list):
-        return "ERROR: Expected a list of classifications."
+    # Robust argument extraction: prioritize 'classifications' from ADK mapping
+    data_list = classifications
+    if data_list is None:
+        data_list = kwargs.get('classifications')
+    
+    if not data_list or not isinstance(data_list, list):
+        print(f"DEBUG: DetectorAgent failed to provide classifications list. Got: {data_list}")
+        return "ERROR: Expected a list of 'classifications'."
 
     results = []
     processed_ids = set()
     
     for cl in classifications:
+        if not isinstance(cl, dict): continue
+        
         # Fuzzy extraction: handle different key names the LLM might hallucinate
         incident_id = cl.get('id') or cl.get('incident_id')
         if not incident_id or incident_id == "null" or incident_id in processed_ids:
@@ -71,6 +79,7 @@ async def process_incident_classifications(classifications: List[Dict[str, Any]]
 
     return json.dumps(results)
 
+
 detector_agent = Agent(
     name="DetectorAgent",
     model=get_model("DetectorAgent"),
@@ -79,31 +88,18 @@ detector_agent = Agent(
         FunctionTool(process_incident_classifications)
     ],
     instruction="""
-    You are the Crisis Detector Agent. Analyze 'active_incidents' and call 'process_incident_classifications'.
+    SYSTEM: Crisis Detector Agent.
+    TASK: Analyze 'active_incidents'. Call 'process_incident_classifications' IMMEDIATELY.
 
-    STRICT JSON RULES:
-    1. NEVER use Python literals like 'None', 'True', or 'False'.
-    2. ALWAYS use JSON 'null', 'true', and 'false'.
-    3. Ensure 'id' matches the incident id from the input EXACTLY.
-    4. Call the tool ONCE and stop.
-
-    EXAMPLE:
-    process_incident_classifications(classifications=[
-      {
-        "id": "INC_123",
-        "type": "flood",
-        "severity": "HIGH",
-        "affected_population": 1500,
-        "expected_duration_hours": 24,
-        "evolution_prediction": {
-          "duration_hours": 24,
-          "peak_time": "2026-05-19T20:00:00",
-          "spread_risk": "MEDIUM"
-        }
-      }
-    ])
+    RULES:
+    1. Be concise. No preamble.
+    2. USE JSON 'null', 'true', 'false'. NEVER Python 'None' or 'True'.
+    3. Estimate 'affected_population' > 500 for urban areas.
+    4. Ensure 'id' matches input EXACTLY.
+    5. Call tool ONCE and STOP.
     """
 )
+
 
 
 

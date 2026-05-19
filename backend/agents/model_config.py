@@ -21,7 +21,7 @@ if GROQ_API_KEYS:
         try:
             # Pass the key directly to the model instance to ensure it's "locked in"
             model_instance = LiteLlm(
-                model="groq/llama-3.1-8b-instant",
+                model="groq/llama-3.3-70b-versatile",
                 api_key=key
             )
             groq_model_pool.append(model_instance)
@@ -37,14 +37,29 @@ if not groq_model_pool and os.getenv("PREFER_GROQ", "False").lower() == "true":
 if GROQ_API_KEY:
     os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 
+# Global index to track current key rotation
+current_key_index = 0
+
+def rotate_groq_key():
+    """Reactive rotation to move to the next key in the pool when 429 occurs."""
+    global current_key_index
+    if groq_model_pool:
+        current_key_index = (current_key_index + 1) % len(groq_model_pool)
+        key = GROQ_API_KEYS[current_key_index % len(GROQ_API_KEYS)]
+        os.environ["GROQ_API_KEY"] = key
+        print(f"DEBUG: Rotated GROQ_API_KEY to pool index {current_key_index}")
+
 def get_model(agent_name: str = None):
     """
     Returns the appropriate model for the agent.
     If multiple Groq keys are available, it partitions them by agent.
     """
     if os.getenv("PREFER_GROQ", "False").lower() == "true" and groq_model_pool:
+        # If we just rotated, we might want to prioritize the rotated key
+        # But usually partitioned mapping is better for parallelism.
+        
         if not agent_name:
-            return groq_model_pool[0]
+            return groq_model_pool[current_key_index % len(groq_model_pool)]
             
         # Map agents to specific model instances in the pool
         mapping = {
@@ -55,16 +70,13 @@ def get_model(agent_name: str = None):
             "ReporterAgent": 4
         }
         
-        # USE MODULO OF POOL SIZE to ensure we stay within valid initialized models
-        idx = mapping.get(agent_name, 0) % len(groq_model_pool)
+        # Add current_key_index as an offset for the base mapping to help recovery
+        base_idx = mapping.get(agent_name, 0)
+        idx = (base_idx + current_key_index) % len(groq_model_pool)
         print(f"DEBUG: Agent '{agent_name}' mapped to Groq key at pool index {idx}")
         return groq_model_pool[idx]
         
     return gemini_model
-
-def rotate_groq_key():
-    """Fallback for reactive rotation if needed."""
-    pass # No longer needed with the pool, but kept for compatibility
 
 def set_key_for_agent(agent_name: str):
     """Sets the environment variable for the agent's mapped key."""

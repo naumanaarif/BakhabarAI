@@ -32,18 +32,41 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def process_simulations_and_messages(simulations: List[Dict[str, Any]], **kwargs) -> str:
+async def process_simulations_and_messages(simulations: List[Dict[str, Any]] = None, **kwargs) -> str:
     """
     Commits your response impact simulations and multi-stakeholder notifications.
     """
-    if not simulations or not isinstance(simulations, list):
-        return "ERROR: Expected a list of simulations."
+    # Robust extraction
+    data_list = simulations if simulations is not None else kwargs.get('simulations')
+
+    if not data_list or not isinstance(data_list, list):
+        print(f"DEBUG: SimulationAgent failed to provide simulations list. Got: {data_list}")
+        return "ERROR: Expected a list of 'simulations'."
 
     results = []
-    for sim in simulations:
-        incident_id = sim.get('incident_id') or sim.get('id')
-        if not incident_id: continue
+    for sim in data_list:
+        if not isinstance(sim, dict): continue
         
+        incident_id = sim.get('incident_id') or sim.get('id')
+        if not incident_id or incident_id == "null": continue
+        
+        # DEDUPING: Check for recent simulation (last 30 mins) to prevent duplicates
+        from firebase_config import db
+        from google.cloud.firestore_v1 import FieldFilter
+        from datetime import datetime, timedelta
+        
+        recent = db.collection("action_simulations")\
+            .where(filter=FieldFilter("incident_id", "==", incident_id))\
+            .order_by("timestamp", direction="DESCENDING")\
+            .limit(1).get()
+            
+        if recent:
+            last_sim = recent[0].to_dict()
+            ts = last_sim.get("timestamp")
+            if ts and (datetime.now(ts.tzinfo) - ts).total_seconds() < 1800:
+                print(f"DEBUG: Recent simulation for {incident_id} already exists. Skipping.")
+                continue
+
         # Fuzzy Impact extraction (handle string vs object)
         impact = sim.get('impact') or {}
         if isinstance(impact, str):
@@ -93,6 +116,8 @@ async def process_simulations_and_messages(simulations: List[Dict[str, Any]], **
 
     return json.dumps(results)
 
+
+
 executor_agent = Agent(
     name="SimulationStakeholderAgent",
     model=get_model("SimulationStakeholderAgent"),
@@ -101,34 +126,18 @@ executor_agent = Agent(
         FunctionTool(process_simulations_and_messages)
     ],
     instruction="""
-    You are the Simulation Agent. Analyze incidents and call 'process_simulations_and_messages'.
+    SYSTEM: Simulation Agent.
+    TASK: Simulate impact. Call 'process_simulations_and_messages' IMMEDIATELY.
 
-    STRICT JSON RULES:
-    1. NEVER use Python literals like 'None', 'True', or 'False'.
-    2. ALWAYS use JSON 'null', 'true', and 'false'.
-    3. Ensure 'incident_id' matches the incident id from the input EXACTLY.
-    4. Call the tool ONCE and stop.
-
-    EXAMPLE:
-    process_simulations_and_messages(simulations=[
-      {
-        "incident_id": "INC_123",
-        "action_type": "Medical Dispatch",
-        "description": "Ambulances sent via R-23 route.",
-        "impact": {
-          "before_state": "Traffic blocked, casualties high.",
-          "after_state": "Medics on site, traffic diverted.",
-          "improvement_metrics": {"response_time_reduction": "12m", "safety_boost": "40%"}
-        },
-        "notifications": {
-          "public": "Avoid Super Highway.",
-          "hospitals": "Multiple casualties incoming.",
-          "utility_providers": "No power disruption."
-        }
-      }
-    ])
+    RULES:
+    1. Be concise. No preamble.
+    2. USE JSON 'null', 'true', 'false'. NEVER Python 'None' or 'True'.
+    3. 'impact' MUST be an object, NOT a string.
+    4. 'notifications' MUST have: public, hospitals, utility_providers.
+    5. Call tool ONCE and STOP.
     """
 )
+
 
 
 
