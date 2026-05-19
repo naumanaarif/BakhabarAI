@@ -1,17 +1,71 @@
 {
   "scenario_id": "false_001",
-  "name": "False Alarm Recovery",
-  "description": "Initial flood report later contradicted by field units.",
+  "name": "False Alarm Recovery — Clifton Explosion Rumour",
+  "description": "A social media panic erupts claiming a gas explosion in Clifton Block 9. High initial social signal volume triggers agent alert. However, field unit investigation and a verified KE (K-Electric) report contradict the claim — revealing it was a burst water main, not an explosion. System retracts the alert and issues a correction.",
+  "city": "Karachi",
   "initial_signals": [
     {
       "signal_id": "social_false_001",
       "source_type": "social",
-      "source_name": "Twitter",
-      "timestamp": "2024-01-15T12:00:00Z",
-      "location": { "name": "F-7, Islamabad", "lat": 33.7297, "lng": 73.0548 },
-      "content": "Big explosion heard in F-7!!",
-      "credibility_score": 0.4,
+      "source_name": "X (Twitter)",
+      "timestamp": "2025-03-15T16:00:00Z",
+      "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8085, "lng": 67.0328 },
+      "content": "HUGE BLAST in Clifton Block 9 near Boat Basin!! Gas cylinder explosion. Black smoke visible from far. Run! #KarachiBlast #Clifton",
+      "credibility_score": 0.38,
+      "is_mock": true
+    },
+    {
+      "signal_id": "social_false_002",
+      "source_type": "social",
+      "source_name": "WhatsApp Report",
+      "timestamp": "2025-03-15T16:03:00Z",
+      "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8090, "lng": 67.0330 },
+      "content": "Clifton mein dhamaka hua hai, logon ko ghar se nikaalna shuru kar diya. Bahut zyada dhuaan aa raha hai bhai!",
+      "credibility_score": 0.35,
+      "is_mock": true
+    },
+    {
+      "signal_id": "social_false_003",
+      "source_type": "social",
+      "source_name": "Facebook Group: Karachi Citizens",
+      "timestamp": "2025-03-15T16:08:00Z",
+      "location": { "name": "Clifton, Karachi", "lat": 24.8100, "lng": 67.0350 },
+      "content": "Unverified: Reports of explosion near Boat Basin. No official confirmation yet. Please avoid area and stay calm.",
+      "credibility_score": 0.45,
+      "is_mock": true
+    },
+    {
+      "signal_id": "fr_false_001",
+      "source_type": "field_report",
+      "source_name": "Karachi Fire Brigade Unit KFB-03",
+      "timestamp": "2025-03-15T16:25:00Z",
+      "location": { "name": "Clifton Block 9, Boat Basin, Karachi", "lat": 24.8085, "lng": 67.0328 },
+      "content": "On-ground investigation complete. NO explosion. NO gas leak. What happened: A high-pressure KWSB water main burst loudly — created steam cloud and loud bang. Area is SAFE. All social media reports are FALSE. Crowd dispersing.",
+      "credibility_score": 0.99,
+      "is_mock": true
+    },
+    {
+      "signal_id": "fr_false_002",
+      "source_type": "field_report",
+      "source_name": "SSGC Gas Inspector - Clifton Zone",
+      "timestamp": "2025-03-15T16:30:00Z",
+      "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8085, "lng": 67.0328 },
+      "content": "SSGC confirms: All gas pipelines in Clifton Block 8-9 are INTACT. No gas leak or explosion detected. Source of panic: Burst KWSB pipeline under road. RETRACT all alerts.",
+      "credibility_score": 1.0,
       "is_mock": true
     }
-  ]
+  ],
+  "conflicting_signals": {
+    "initial_claim": "Gas explosion / blast",
+    "contradicting_source": "KFB Field Unit + SSGC Inspector",
+    "actual_event": "Burst KWSB water main under road — loud bang + steam cloud misinterpreted as explosion",
+    "retraction_message": "ALERT RETRACTED: No explosion in Clifton. Cause confirmed as a burst water pipeline (KWSB). Area declared safe. KWSB repair crew dispatched. Normal traffic to resume within 2 hours."
+  },
+  "expected_output": {
+    "crisis_type": "false_alarm",
+    "initial_severity": "HIGH",
+    "final_status": "false_alarm",
+    "confidence_retraction": 0.97,
+    "retraction_issued": true
+  }
 }

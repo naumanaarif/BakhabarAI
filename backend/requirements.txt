@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
 google-adk[extensions]
-google-generativeai
-google-cloud-aiplatform
+google-generativeai==0.8.6
+google-cloud-aiplatform==1.148.1
 litellm
 groq
 googlemaps

@@ -2,11 +2,41 @@
   {
     "signal_id": "fr_001",
     "source_type": "field_report",
-    "source_name": "Rescue 1122 Field Unit",
-    "timestamp": "2024-01-15T15:00:00Z",
-    "location": { "name": "G-10 Service Road", "lat": 33.6850, "lng": 73.0480 },
-    "content": "Confirmed: Water level rising. Road partially submerged. Deploying barriers.",
-    "credibility_score": 0.95,
+    "source_name": "KMC Field Unit - Korangi",
+    "timestamp": "2025-08-10T07:50:00Z",
+    "location": { "name": "Korangi Industrial Road, Karachi", "lat": 24.8230, "lng": 67.1200 },
+    "content": "Confirmed: Korangi Industrial Road completely blocked. Water depth 4 feet at lowest point. Minimum 200 vehicles stranded. Rescue boats required urgently.",
+    "credibility_score": 0.98,
+    "is_mock": true
+  },
+  {
+    "signal_id": "fr_002",
+    "source_type": "field_report",
+    "source_name": "Motorway Police Unit MP-09",
+    "timestamp": "2025-06-20T12:05:00Z",
+    "location": { "name": "M-9 Motorway KM-32, Karachi", "lat": 24.8915, "lng": 67.2720 },
+    "content": "Confirmed: 9-vehicle pileup. 1 oil tanker overturned. Fuel spill 200m radius. 14 casualties, 3 critical. M-9 closed indefinitely. Alternative route via Super Highway activated. Fire brigade needed.",
+    "credibility_score": 0.99,
+    "is_mock": true
+  },
+  {
+    "signal_id": "fr_003",
+    "source_type": "field_report",
+    "source_name": "Karachi Fire Brigade Unit KFB-03",
+    "timestamp": "2025-03-15T16:25:00Z",
+    "location": { "name": "Clifton Block 9, Boat Basin, Karachi", "lat": 24.8085, "lng": 67.0328 },
+    "content": "On-ground investigation complete. NO explosion. NO gas leak. What happened: A high-pressure KWSB water main burst loudly — created steam cloud and loud bang. Area is SAFE. All social media reports are FALSE.",
+    "credibility_score": 0.99,
+    "is_mock": true
+  },
+  {
+    "signal_id": "fr_004",
+    "source_type": "field_report",
+    "source_name": "SSGC Gas Inspector - Clifton Zone",
+    "timestamp": "2025-03-15T16:30:00Z",
+    "location": { "name": "Clifton Block 9, Karachi", "lat": 24.8085, "lng": 67.0328 },
+    "content": "SSGC confirms: All gas pipelines in Clifton Block 8-9 are INTACT. No gas leak or explosion detected. Source of panic: Burst KWSB pipeline under road. RETRACT all alerts.",
+    "credibility_score": 1.0,
     "is_mock": true
   }
 ]
