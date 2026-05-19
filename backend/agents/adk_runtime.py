@@ -148,7 +148,9 @@ async def run_agent_standalone(agent, input_text: str) -> str:
         
         final_output = ""
         event_count = 0
-        executed_tool_calls = set() # Prevent duplicate tool calls in the same stream
+        tool_call_count = 0
+        max_tool_calls = 5 # Safety valve for Llama loops
+        executed_tool_calls = set() # Prevent identical duplicate tool calls
         
         try:
             # Pass only the context to run_async
@@ -156,102 +158,71 @@ async def run_agent_standalone(agent, input_text: str) -> str:
                 async for event in agen:
                     event_count += 1
                     elapsed = time.time() - start_run
-                    # ... (rest of the logic)
                     
+                    if tool_call_count >= max_tool_calls:
+                        print(f"CRITICAL: Agent {agent.name} exceeded max tool calls ({max_tool_calls}). Force-breaking generator.")
+                        # Force close the generator to stop ADK internals
+                        await agen.aclose()
+                        break
+
                     if event.author != "user":
-                        # Capture tool calls specifically for meaningful notifications
+                        # Capture tool calls
                         tool_calls = []
                         event_text = ""
+                        has_terminal_response = False
+
                         if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
                             for part in event.content.parts:
+                                if tool_call_count >= max_tool_calls:
+                                    print(f"CRITICAL: Agent {agent.name} exceeded max tool calls ({max_tool_calls}). Force-breaking part loop.")
+                                    has_terminal_response = True
+                                    break
+
                                 if hasattr(part, 'call') and part.call:
-                                    # Create a unique hash for this tool call to prevent loops
+                                    tool_call_count += 1
                                     call_hash = f"{part.call.name}:{json.dumps(part.call.args, sort_keys=True)}"
                                     if call_hash in executed_tool_calls:
-                                        print(f"DEBUG: Skipping duplicate tool call: {part.call.name}")
+                                        print(f"DEBUG: Skipping identical duplicate tool call: {part.call.name}")
                                         continue
                                     executed_tool_calls.add(call_hash)
-                                    
-                                    tool_calls.append({
-                                        "tool": part.call.name,
-                                        "args": part.call.args
-                                    })
+                                    tool_calls.append({"tool": part.call.name, "args": part.call.args})
+                                
                                 elif hasattr(part, 'response') and part.response:
-                                    tool_calls.append({
-                                        "tool_response": part.response.name,
-                                        "result": part.response.result
-                                    })
+                                    res_str = str(part.response.result)
+                                    if '"terminal": true' in res_str.lower() or '"DATA_LOCKED"' in res_str:
+                                        has_terminal_response = True
+                                    tool_calls.append({"tool_response": part.response.name, "result": part.response.result})
+                                
                                 elif hasattr(part, 'text') and part.text:
                                     event_text += part.text
-
-                        # Convert model to dict and sanitize for GeoPoints/etc.
-                        try:
-                            event_dict = event.model_dump()
-                            sanitized_event = sanitize_for_json(event_dict)
                             
-                            # Clean and use text content if present
+                            if tool_call_count >= max_tool_calls:
+                                break
+
+                        # Normal logging logic...
+                        try:
                             action_desc = clean_event_text(event_text)
+                            if has_terminal_response:
+                                action_desc = "Task finalized. Committing results to dashboard."
                             
                             if not action_desc:
-                                # Fallback to tool calls
+                                # (existing fallback logic)
                                 if tool_calls:
                                     actions = []
                                     for tc in tool_calls:
-                                        if "tool" in tc:
-                                            name = tc['tool']
-                                            actions.append(f"Running task: {name.replace('_', ' ').title()}")
-                                        if "tool_response" in tc:
-                                            name = tc['tool_response']
-                                            actions.append(f"Completed: {name.replace('_', ' ').title()}")
+                                        if "tool" in tc: actions.append(f"Running task: {tc['tool'].replace('_', ' ').title()}")
+                                        if "tool_response" in tc: actions.append(f"Completed: {tc['tool_response'].replace('_', ' ').title()}")
                                     action_desc = " | ".join(actions)
-                                else:
-                                    # Generative fallbacks based on agent name
-                                    author_lower = event.author.lower()
-                                    if "collector" in author_lower or "fusion" in author_lower:
-                                        action_desc = "Signal Fusion: Normalizing & filtering incoming feeds..."
-                                    elif "detector" in author_lower:
-                                        action_desc = "Detector: Classifying crisis coordinates & severity..."
-                                    elif "planner" in author_lower:
-                                        action_desc = "Resource Planner: Allocating rescue units..."
-                                    elif "executor" in author_lower or "simulation" in author_lower:
-                                        action_desc = "Simulation: Simulating response impact & detours..."
-                                    elif "reporter" in author_lower:
-                                        action_desc = "Reporter: Compiling final before/after summary..."
-                                    else:
-                                        action_desc = "AI System Processing"
-
-                            # Normalize agent display name
-                            disp_name = event.author
-                            if "collector" in disp_name.lower() or "fusion" in disp_name.lower():
-                                disp_name = "Signal Fusion Agent"
-                            elif "detector" in disp_name.lower():
-                                disp_name = "Crisis Detector Agent"
-                            elif "planner" in disp_name.lower():
-                                disp_name = "Resource Planner Agent"
-                            elif "executor" in disp_name.lower() or "simulation" in disp_name.lower():
-                                disp_name = "Simulation Agent"
-                            elif "reporter" in disp_name.lower():
-                                disp_name = "Reporter Agent"
-
-                            tracer.log(
-                                agent_name=disp_name,
-                                action=action_desc,
-                                input_data={"tool_calls": tool_calls},
-                                output_data=sanitized_event,
-                                confidence=1.0
-                            )
+                            
+                            tracer.log(agent_name=event.author, action=action_desc or "AI processing", input_data={"tool_calls": tool_calls}, output_data=sanitize_for_json(event.model_dump()), confidence=1.0)
                         except Exception as e:
-                            # If logging fails, print but don't crash
-                            print(f"DEBUG: Error logging event for {disp_name}: {e}")
-                            tracer.log(
-                                agent_name=disp_name,
-                                action="AI processing step",
-                                input_data={},
-                                output_data={"error": str(e)},
-                                confidence=0.5
-                            )
+                            print(f"DEBUG: Error logging: {e}")
+
+                        # If we just received a terminal tool response, we can break early if the model keeps talking
+                        if has_terminal_response and tool_call_count >= 1:
+                            print(f"DEBUG: Received terminal response from tool. Preparing to close agent {agent.name}.")
+                            # We don't break immediately to allow the model to say "Processing complete"
                     
-                    # Capture output from events
                     if hasattr(event, 'content') and event.content:
                         if hasattr(event.content, 'parts'):
                             for part in event.content.parts:

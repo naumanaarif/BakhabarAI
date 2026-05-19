@@ -56,30 +56,26 @@ async def run_crisis_simulation(scenario_data: dict = None):
             print(f"DEBUG: [ISOLATION] Mock/Stress mode. Processing {len(pending_signals)} signals.")
             
         active_incidents = query_active_incidents()
-        
         if pending_signals:
             print(f"DEBUG: Running SignalFusionAgent for {len(pending_signals)} isolated signals...")
-            
-            # CLEAR PENDING SIGNALS IMMEDIATELY to prevent double-processing if agent loops or retries
-            from services.firebase_service import FirebaseService
-            for s in pending_signals:
-                FirebaseService.update_signal_status(s['id'], "processing")
-            
+
             # Sanitize for prompt
             clean_signals = sanitize(pending_signals)
             clean_incidents = sanitize(active_incidents)
-            
+
             prompt = f"Process the following pending signals and active incidents:\nSignals: {json.dumps(clean_signals, default=str)}\nIncidents: {json.dumps(clean_incidents, default=str)}"
             await run_agent_standalone(signal_collector_agent, prompt)
-            
-            # Mark as fully processed
+
+            # Mark as fully processed after success
+            from services.firebase_service import FirebaseService
             for s in pending_signals:
                 FirebaseService.update_signal_status(s['id'], "processed")
             print("DEBUG: Marked all pending signals as processed.")
-            
+
             # Small cooldown between agents to respect TPM limits
             import asyncio
             await asyncio.sleep(2)
+
         else:
             print("DEBUG: No pending signals to process.")
             tracer.log("System", "No new signals to process.", {}, {})

@@ -23,38 +23,48 @@ from tools.firebase_tools import query_active_incidents, update_incident_details
 from tracer import tracer
 from .model_config import get_model
 
-async def process_incident_classifications(classifications: List[Dict[str, Any]] = None, **kwargs) -> str:
+_PROCESSED_INCIDENTS = set()
+
+async def process_incident_classifications(payload: Dict[str, Any] = None, **kwargs) -> str:
     """
     Commits your detailed crisis classification.
     """
-    # Robust argument extraction: prioritize 'classifications' from ADK mapping
-    data_list = classifications
-    if data_list is None:
-        data_list = kwargs.get('classifications')
+    from firebase_config import db
+    # Robust extraction
+    data = payload if payload is not None else kwargs
+    classifications = data.get('classifications') or data.get('payload', {}).get('classifications')
     
-    if not data_list or not isinstance(data_list, list):
-        print(f"DEBUG: DetectorAgent failed to provide classifications list. Got: {data_list}")
-        return "ERROR: Expected a list of 'classifications'."
+    if not classifications or not isinstance(classifications, list):
+        return "ERROR: Expected 'classifications' list in payload."
 
     results = []
-    processed_ids = set()
     
     for cl in classifications:
         if not isinstance(cl, dict): continue
         
-        # Fuzzy extraction: handle different key names the LLM might hallucinate
         incident_id = cl.get('id') or cl.get('incident_id')
-        if not incident_id or incident_id == "null" or incident_id in processed_ids:
+        if not incident_id or incident_id == "null": continue
+        
+        # 1. SESSION CACHE
+        if incident_id in _PROCESSED_INCIDENTS:
+            print(f"DEBUG: Detector: Incident {incident_id} already processed in session.")
             continue
-        processed_ids.add(incident_id)
 
-        # Extract type, severity, population
+        # 2. DATABASE LOOP BREAKER
+        doc = db.collection("incidents").document(incident_id).get()
+        if doc.exists:
+            inc_data = doc.to_dict()
+            # If affected_population is already > 0, it means it was already classified
+            if inc_data.get("affected_population", 0) > 0:
+                print(f"DEBUG: Detector: Incident {incident_id} already has classification. Skipping to break loop.")
+                _PROCESSED_INCIDENTS.add(incident_id)
+                continue
+
         inc_type = cl.get('type') or cl.get('incident_type') or 'emergency'
         severity = cl.get('severity') or 'MEDIUM'
         pop = cl.get('affected_population') or cl.get('population') or 800
         duration = cl.get('expected_duration_hours') or cl.get('duration') or 12
 
-        # Extract evolution prediction (nested or flat)
         evo = cl.get('evolution_prediction') or {}
         if not isinstance(evo, dict): evo = {}
         
@@ -75,9 +85,15 @@ async def process_incident_classifications(classifications: List[Dict[str, Any]]
         }
 
         update_incident_details(incident_id, clean_cl)
+        _PROCESSED_INCIDENTS.add(incident_id)
         results.append(incident_id)
 
-    return json.dumps(results)
+    return json.dumps({
+        "status": "SUCCESS", 
+        "terminal": True, 
+        "message": "CLASSIFICATION_LOCKED: Data committed. DO NOT RETRY.",
+        "classified_ids": results
+    })
 
 
 detector_agent = Agent(
@@ -89,16 +105,16 @@ detector_agent = Agent(
     ],
     instruction="""
     SYSTEM: Crisis Detector Agent.
-    TASK: Analyze 'active_incidents'. Call 'process_incident_classifications' IMMEDIATELY.
+    TASK: Call 'process_incident_classifications' ONCE for ALL active incidents.
 
-    RULES:
-    1. Be concise. No preamble.
-    2. USE JSON 'null', 'true', 'false'. NEVER Python 'None' or 'True'.
-    3. Estimate 'affected_population' > 500 for urban areas.
-    4. Ensure 'id' matches input EXACTLY.
-    5. Call tool ONCE and STOP.
+    STOP PROTOCOL:
+    1. Call tool with: payload={"classifications": [...]}
+    2. After tool response, say "Classification complete." and TERMINATE.
+    3. NEVER call the tool a second time.
     """
 )
+
+
 
 
 

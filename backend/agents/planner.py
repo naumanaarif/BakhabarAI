@@ -16,43 +16,60 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def process_resource_allocations(allocations: List[Dict[str, Any]] = None, trade_offs: List[str] = None, **kwargs) -> str:
+_PROCESSED_ALLOCATIONS = set()
+
+async def process_resource_allocations(payload: Dict[str, Any] = None, **kwargs) -> str:
     """
     Commits your resource allocation decisions and trade-off rationale.
     """
-    # Robust argument extraction
-    data_allocs = allocations if allocations is not None else kwargs.get('allocations')
-    data_trades = trade_offs if trade_offs is not None else kwargs.get('trade_offs', [])
+    from firebase_config import db
+    # Robust extraction
+    data = payload if payload is not None else kwargs
+    allocations = data.get('allocations') or data.get('payload', {}).get('allocations')
+    trade_offs = data.get('trade_offs') or data.get('payload', {}).get('trade_offs', [])
 
-    if not isinstance(data_allocs, list):
-        print(f"DEBUG: ResourcePlannerAgent failed to provide allocations list. Got: {data_allocs}")
-        return "ERROR: Expected a list of 'allocations'."
+    if not isinstance(allocations, list):
+        return "ERROR: Expected 'allocations' list in payload."
 
     results_count = 0
-    for c in data_allocs:
+    for c in allocations:
         if not isinstance(c, dict): continue
         
-        # Fuzzy extraction
         resource_id = c.get('resource_id') or c.get('res_id') or c.get('resource')
         incident_id = c.get('incident_id') or c.get('inc_id') or c.get('incident')
             
         if resource_id and incident_id:
+            pair_id = f"{resource_id}:{incident_id}"
+            if pair_id in _PROCESSED_ALLOCATIONS: continue
+
             try:
-                # DEDUPING: Check if this resource is already assigned to this incident
-                from firebase_config import db
+                # 1. Resource Availability Check
+                res_doc = db.collection("resources").document(resource_id).get()
+                if res_doc.exists and res_doc.to_dict().get("status") == "deployed":
+                    print(f"DEBUG: Resource {resource_id} is already deployed. Skipping to break loop.")
+                    _PROCESSED_ALLOCATIONS.add(pair_id)
+                    continue
+
+                # 2. Incident Link Check
                 inc_doc = db.collection("incidents").document(incident_id).get()
                 if inc_doc.exists:
                     existing_res = inc_doc.to_dict().get("assigned_resources", [])
-                    if resource_id in existing_res:
-                        print(f"DEBUG: Resource {resource_id} already assigned to {incident_id}. Skipping.")
+                    if resource_id in existing_res: 
+                        _PROCESSED_ALLOCATIONS.add(pair_id)
                         continue
                 
                 assign_resource_to_incident(resource_id, incident_id)
+                _PROCESSED_ALLOCATIONS.add(pair_id)
                 results_count += 1
             except Exception as e:
-                print(f"DEBUG: Skipping invalid resource assignment {resource_id} -> {incident_id}: {e}")
+                print(f"DEBUG: Skipping invalid resource assignment: {e}")
     
-    return json.dumps({"status": "success", "allocations_count": results_count, "trade_offs": data_trades})
+    return json.dumps({
+        "status": "SUCCESS", 
+        "terminal": True, 
+        "message": "ALLOCATION_LOCKED: Resources committed. DO NOT RETRY.",
+        "allocations": results_count
+    })
 
 
 planner_agent = Agent(
@@ -64,16 +81,16 @@ planner_agent = Agent(
     ],
     instruction="""
     SYSTEM: Resource Planner Agent.
-    TASK: Allocate resources. Call 'process_resource_allocations' IMMEDIATELY.
+    TASK: Call 'process_resource_allocations' ONCE to assign resources.
 
-    RULES:
-    1. Be concise. No preamble.
-    2. USE JSON 'null', 'true', 'false'. NEVER Python 'None' or 'True'.
-    3. Match resource types (Ambulance for Accident, etc).
-    4. Ensure 'incident_id' matches input EXACTLY.
-    5. Call tool ONCE and STOP.
+    STOP PROTOCOL:
+    1. Call tool with: payload={"allocations": [...], "trade_offs": [...]}
+    2. After tool response, say "Allocation complete." and TERMINATE.
+    3. NEVER call the tool a second time.
     """
 )
+
+
 
 
 

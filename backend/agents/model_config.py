@@ -20,10 +20,13 @@ if GROQ_API_KEYS:
             
         try:
             # Pass the key directly to the model instance to ensure it's "locked in"
+            # Use low temperature (0.1) for stability and to prevent loops
             model_instance = LiteLlm(
                 model="groq/llama-3.3-70b-versatile",
-                api_key=key
+                api_key=key,
+                temperature=0.1
             )
+
             groq_model_pool.append(model_instance)
             print(f"DEBUG: Successfully added model for key {i+1} to pool.")
         except Exception as e:
