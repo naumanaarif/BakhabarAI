@@ -27,6 +27,7 @@ class Incident {
   final int? expectedDurationHours;
   final String? peakImpactTime;
   final List<String>? signalSources;
+  final String? mediaUrl;
 
   Incident({
     required this.id,
@@ -40,6 +41,7 @@ class Incident {
     this.expectedDurationHours,
     this.peakImpactTime,
     this.signalSources,
+    this.mediaUrl,
   });
 
   factory Incident.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class Incident {
       signalSources: json['signal_sources'] != null 
           ? List<String>.from(json['signal_sources'])
           : null,
+      mediaUrl: json['media_url'] as String?,
     );
   }
 }

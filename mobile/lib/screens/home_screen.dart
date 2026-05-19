@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../core/auth_provider.dart';
+import '../core/utils.dart';
 import 'auth/signup_screen.dart';
 import '../models/incident.dart';
 import '../models/agent_log.dart';
@@ -27,10 +28,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ApiService _apiService = ApiService();
   final LocationService _locationService = LocationService();
   late Stream<List<Incident>> _incidentsStream;
+  late Stream<List<Incident>> _historyStream;
   late Stream<List<AgentTrace>> _logsStream;
   StreamSubscription? _incidentSubscription;
   String? _lastIncidentId;
-  
+  String _currentCity = 'Detecting...';
+
   bool _hasLocationPermission = false;
   bool _hasUnreadNotifications = true;
   GoogleMapController? _mapController;
@@ -44,84 +47,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _incidentsStream = _apiService.getIncidentsStream();
+    _historyStream = _apiService.getIncidentHistoryStream();
     _logsStream = _apiService.getAgentLogsStream();
-    
+    _detectLocation();
+
     // Listen for new incident alerts
     _incidentSubscription = _incidentsStream.listen((incidents) {
       if (incidents.isNotEmpty && mounted) {
         // Sort by id or timestamp if available, but for now we assume the list update is significant
         // We'll take the first one as the most recent/relevant
-        final latestIncident = incidents.first; 
-        
+        final latestIncident = incidents.first;
+
         if (_lastIncidentId != latestIncident.id) {
           final isNew = _lastIncidentId != null;
           _lastIncidentId = latestIncident.id;
-          
+
           if (isNew) {
-            // Delay notification slightly to give DetectorAgent time to refine 'unknown' type
-            Future.delayed(const Duration(seconds: 2), () {
-              if (!mounted) return;
-              
-              // Re-fetch latest state or check if type is still unknown
-              // (Simplest way for demo is just checking the latest list again if needed,
-              // but usually 2s is enough for the next stream event to arrive with better data)
-              
-              if (latestIncident.type.toLowerCase() == 'unknown' || latestIncident.type.toLowerCase() == 'incident') {
-                 // Try to wait for one more tick or just show as 'Emergency'
-              }
+            setState(() {
+              _hasUnreadNotifications = true;
+            });
 
-              setState(() {
-                _hasUnreadNotifications = true;
-              });
+            // Clear existing snackbars to prevent stacking/manual removal
+            ScaffoldMessenger.of(context).clearSnackBars();
 
-              // Show in-app short notification (SnackBar)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
+            // Show optimized in-app notification
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4), // Auto-removes
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 70), // Positions above nav bar
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                backgroundColor: Colors.black.withOpacity(0.9),
+                content: InkWell(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => IncidentDetailScreen(incidentId: latestIncident.id),
+                      ),
+                    );
+                  },
+                  child: Row(
                     children: [
-                      Icon(LucideIcons.alertTriangle, color: _getSeverityColor(latestIncident.severity), size: 18),
+                      Icon(
+                        LucideIcons.alertTriangle,
+                        color: _getSeverityColor(latestIncident.severity),
+                        size: 18,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'CRISIS ALERT: ${latestIncident.type.toUpperCase()} in ${latestIncident.location.name.split(',')[0]}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'NEW CRISIS DETECTED',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              '${latestIncident.type.toUpperCase()} in ${latestIncident.location.name.split(',')[0]}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                            ),
+                          ],
                         ),
                       ),
+                      const Icon(LucideIcons.chevronRight, color: Colors.white54, size: 16),
                     ],
                   ),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.textPrimary,
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'DETAILS',
-                    textColor: AppColors.accent,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => IncidentDetailScreen(incidentId: latestIncident.id),
-                        ),
-                      );
-                    },
-                  ),
                 ),
-              );
+              ),
+            );
 
-              // Show outside-app notification
-              NotificationService().showNotification(
-                id: latestIncident.id.hashCode,
-                title: 'CRISIS ALERT: ${latestIncident.type.toUpperCase()}',
-                body: 'Detected in ${latestIncident.location.name}. Confidence: ${(latestIncident.confidence * 100).toInt()}%',
-              );
-            });
+            // Show outside-app notification
+            NotificationService().showNotification(
+              id: latestIncident.id.hashCode,
+              title: 'CRISIS ALERT: ${latestIncident.type.toUpperCase()}',
+              body:
+                  'Detected in ${latestIncident.location.name}. Confidence: ${(latestIncident.confidence * 100).toInt()}%',
+            );
           }
         }
       }
     });
 
     Geolocator.checkPermission().then((permission) {
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
         if (mounted) setState(() => _hasLocationPermission = true);
       }
     });
@@ -136,6 +154,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void dispose() {
     _incidentSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _detectLocation() async {
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always) {
+      if (mounted) setState(() => _hasLocationPermission = true);
+      final pos = await _locationService.getCurrentPosition();
+      if (pos != null) {
+        try {
+          // Detect city based on Latitude (Karachi ~24.8, Islamabad ~33.6)
+          if (pos.latitude < 26) {
+            if (mounted) setState(() => _currentCity = 'Karachi');
+          } else {
+            if (mounted) setState(() => _currentCity = 'Islamabad');
+          }
+
+          if (_mapController != null) {
+            _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(
+                LatLng(pos.latitude, pos.longitude),
+                12.0,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) setState(() => _currentCity = 'Pakistan');
+        }
+      } else {
+        if (mounted) setState(() => _currentCity = 'Islamabad');
+      }
+    } else {
+      if (mounted) setState(() => _currentCity = 'Islamabad');
+    }
   }
 
   void _showLocationPopup() {
@@ -186,23 +238,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ElevatedButton(
                     onPressed: () async {
                       Navigator.of(dialogContext).pop();
-                      final granted = await _locationService.handleLocationPermission();
+                      final granted = await _locationService
+                          .handleLocationPermission();
                       if (granted) {
                         setState(() {
                           _hasLocationPermission = true;
                         });
-                        final pos = await _locationService.getCurrentPosition();
-                        if (pos != null && _mapController != null) {
-                          _mapController!.animateCamera(
-                            CameraUpdate.newLatLngZoom(
-                              LatLng(pos.latitude, pos.longitude),
-                              14.0,
-                            ),
-                          );
-                        }
+                        await _detectLocation();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Location access granted! Live tracking enabled.'),
+                            content: Text(
+                              'Location access granted! Live tracking enabled.',
+                            ),
                             backgroundColor: AppColors.successGreen,
                           ),
                         );
@@ -303,7 +350,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             elevation: 0,
                             centerTitle: true,
                             leading: IconButton(
-                              icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                              icon: const Icon(
+                                Icons.close,
+                                color: AppColors.textPrimary,
+                              ),
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                             title: const Text(
@@ -321,7 +371,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               Navigator.of(context).pop();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Successfully authenticated as $name!'),
+                                  content: Text(
+                                    'Successfully authenticated as $name!',
+                                  ),
                                   backgroundColor: AppColors.successGreen,
                                 ),
                               );
@@ -347,7 +399,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ref.read(authProvider.notifier).logout();
                             Navigator.of(context).pop();
                           },
-                          child: const Text('Log Out', style: TextStyle(color: AppColors.dangerRed)),
+                          child: const Text(
+                            'Log Out',
+                            style: TextStyle(color: AppColors.dangerRed),
+                          ),
                         ),
                       ],
                     ),
@@ -360,12 +415,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: authState.isAuthenticated ? AppColors.accent : Colors.grey.shade300,
+                    color: authState.isAuthenticated
+                        ? AppColors.accent
+                        : Colors.grey.shade300,
                     width: 2,
                   ),
                   image: const DecorationImage(
                     image: NetworkImage(
-                      'https://ui-avatars.com/api/?name=User&background=random',
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUKmia2wx8eVAvXT0lkvLLWAjIb20DQWVZINsTAYmYbObi-tD1dc0cTtLwf2elMnGAuQuc-ZMMX66aSTrhoYwO8diUfnlDxC-hc2-F3HQiSB8EPCsNTSpkUhBqlW4lxb9ylebE-5S9Ofs_DajW-sIjJVYD3XpfwxhQBq5U5hYwq5UOvJd0VYsFKvm382WYUfH3p9PkZUucNsnxf-3wzNtYPpQNQTX4EdDRavqEYy4YxPuW2p6mUTXEyGh7_ZZ9EG_sZNQ0Ue72SA',
                     ),
                     fit: BoxFit.cover,
                   ),
@@ -373,11 +430,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              authState.isAuthenticated ? 'Salam, ${authState.userName}!' : 'Salam!',
-              style: AppTextStyles.h1.copyWith(
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 20,
+            Expanded(
+              child: Text(
+                authState.isAuthenticated
+                    ? 'Salam, ${authState.userName}!'
+                    : 'Salam!',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: AppTextStyles.h1.copyWith(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontSize: 20,
+                ),
               ),
             ),
           ],
@@ -389,7 +452,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               alignment: Alignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(LucideIcons.bell, color: AppColors.textPrimary, size: 24),
+                  icon: const Icon(
+                    LucideIcons.bell,
+                    color: AppColors.textPrimary,
+                    size: 24,
+                  ),
                   onPressed: () => _showNotificationsSheet(context),
                 ),
                 if (_hasUnreadNotifications)
@@ -440,7 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: Colors.black.withOpacity(0.06),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
-                          )
+                          ),
                         ],
                       ),
                       child: ClipRRect(
@@ -468,28 +535,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               left: 12,
                               right: 12,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.9),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                  ),
                                 ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        const Icon(LucideIcons.mapPin, color: AppColors.accent, size: 18),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Monitoring Zone Alpha',
-                                          style: AppTextStyles.label.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            LucideIcons.mapPin,
+                                            color: AppColors.accent,
+                                            size: 18,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              incidents.isNotEmpty 
+                                                  ? incidents.first.location.name.split(',')[0] 
+                                                  : '$_currentCity Monitoring',
+                                              style: AppTextStyles.label.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 12),
                                     Row(
                                       children: [
                                         Container(
@@ -503,10 +589,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         const SizedBox(width: 6),
                                         Text(
                                           '${incidents.length} Active',
-                                          style: AppTextStyles.bodyMuted.copyWith(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: AppTextStyles.bodyMuted
+                                              .copyWith(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                         ),
                                       ],
                                     ),
@@ -554,7 +641,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     // Incident list preview
                     _buildPreviewList(snapshot),
-                    const SizedBox(height: 120), // Space for FAB and bottom navigation
+                    const SizedBox(
+                      height: 120,
+                    ), // Space for FAB and bottom navigation
                   ],
                 ),
               ),
@@ -578,11 +667,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             children: [
-              const Icon(LucideIcons.alertTriangle, color: AppColors.dangerRed, size: 40),
+              const Icon(
+                LucideIcons.alertTriangle,
+                color: AppColors.dangerRed,
+                size: 40,
+              ),
               const SizedBox(height: 8),
               Text('Error loading preview', style: AppTextStyles.h2),
               const SizedBox(height: 4),
-              Text(snapshot.error.toString(), style: AppTextStyles.bodyMuted, textAlign: TextAlign.center),
+              Text(
+                snapshot.error.toString(),
+                style: AppTextStyles.bodyMuted,
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -601,11 +698,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         child: Column(
           children: [
-            const Icon(LucideIcons.checkCircle, color: AppColors.successGreen, size: 40),
+            const Icon(
+              LucideIcons.checkCircle,
+              color: AppColors.successGreen,
+              size: 40,
+            ),
             const SizedBox(height: 12),
             Text('All Clear', style: AppTextStyles.h2),
             const SizedBox(height: 4),
-            Text('No active crises in your area.', style: AppTextStyles.bodyMuted),
+            Text(
+              'No active crises in your area.',
+              style: AppTextStyles.bodyMuted,
+            ),
           ],
         ),
       );
@@ -631,7 +735,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => IncidentDetailScreen(incidentId: incident.id),
+                  builder: (context) =>
+                      IncidentDetailScreen(incidentId: incident.id),
                 ),
               );
             },
@@ -640,10 +745,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border(
-                  left: BorderSide(
-                    color: severityColor,
-                    width: 4,
-                  ),
+                  left: BorderSide(color: severityColor, width: 4),
                 ),
               ),
               padding: const EdgeInsets.all(16),
@@ -660,12 +762,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             fontFamily: 'Plus Jakarta Sans',
                             fontSize: 16,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: _getSeverityBgColor(incident.severity),
                           borderRadius: BorderRadius.circular(8),
@@ -684,13 +789,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(LucideIcons.clock, size: 14, color: AppColors.textMuted),
+                      const Icon(
+                        LucideIcons.clock,
+                        size: 14,
+                        color: AppColors.textMuted,
+                      ),
                       const SizedBox(width: 4),
-                      Text(
-                        'Live • ${incident.location.name}',
-                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Expanded(
+                        child: Text(
+                          '${TimeUtils.formatTimeAgo(incident.timestamp)} • ${incident.location.name}',
+                          style: AppTextStyles.bodyMuted.copyWith(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -758,62 +869,105 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Notifications',
-                    style: AppTextStyles.h1.copyWith(fontSize: 22),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Alert History',
+                        style: AppTextStyles.h1.copyWith(fontSize: 22),
                       ),
-                    ),
+                      const Text(
+                        'Recent emergency notifications',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          // For demo, we just hide the red dot. 
+                          // In a real app, this would update a 'last_read' timestamp in Firebase.
+                          setState(() {
+                            _hasUnreadNotifications = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Notifications marked as read'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Clear',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close, color: AppColors.textPrimary, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             const Divider(height: 1, color: Colors.black12),
-            
+
             // Notification List (Live from Incidents)
             Expanded(
               child: StreamBuilder<List<Incident>>(
-                stream: _incidentsStream,
-                initialData: const [],
+                stream: _historyStream,
                 builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: AppColors.accent),
+                          SizedBox(height: 16),
+                          Text('Updating history...',
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                        ],
+                      ),
+                    );
+                  }
+
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error loading alerts', style: AppTextStyles.bodyMuted));
+                    return Center(
+                      child: Text(
+                        'Error loading alerts',
+                        style: AppTextStyles.bodyMuted,
+                      ),
+                    );
                   }
 
                   final incidents = snapshot.data ?? [];
-                  if (incidents.isEmpty && snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.accent));
-                  }
-
                   if (incidents.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.bellOff, size: 48, color: AppColors.textMuted.withOpacity(0.3)),
+                          Icon(
+                            LucideIcons.bellOff,
+                            size: 48,
+                            color: AppColors.textMuted.withOpacity(0.3),
+                          ),
                           const SizedBox(height: 16),
                           Text('No new alerts', style: AppTextStyles.bodyMuted),
                         ],
@@ -822,7 +976,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     itemCount: incidents.length,
                     itemBuilder: (context, index) {
                       final incident = incidents[index];
@@ -833,7 +990,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Navigator.of(context).pop(); // Close sheet
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (context) => IncidentDetailScreen(incidentId: incident.id),
+                              builder: (context) =>
+                                  IncidentDetailScreen(incidentId: incident.id),
                             ),
                           );
                         },
@@ -850,10 +1008,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ],
                             border: Border(
-                              left: BorderSide(
-                                color: color,
-                                width: 4,
-                              ),
+                              left: BorderSide(color: color, width: 4),
                             ),
                           ),
                           padding: const EdgeInsets.all(16),
@@ -891,15 +1046,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ),
                                         ),
                                         Text(
-                                          'Just now',
-                                          style: AppTextStyles.labelMuted.copyWith(fontSize: 10),
+                                          TimeUtils.formatTimeAgo(incident.timestamp),
+                                          style: AppTextStyles.labelMuted
+                                              .copyWith(fontSize: 10),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       'A ${incident.severity.toLowerCase()} severity crisis detected in ${incident.location.name}. Confidence is ${(incident.confidence * 100).toInt()}%.',
-                                      style: AppTextStyles.bodyMuted.copyWith(fontSize: 13, height: 1.4),
+                                      style: AppTextStyles.bodyMuted.copyWith(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
@@ -927,4 +1086,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
+
 }

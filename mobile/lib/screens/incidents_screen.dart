@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme.dart';
+import '../core/utils.dart';
 import '../models/incident.dart';
 import '../services/api_service.dart';
 import '../widgets/skeleton_loader.dart';
@@ -18,11 +19,22 @@ class IncidentsScreen extends StatefulWidget {
 class _IncidentsScreenState extends State<IncidentsScreen> {
   final ApiService _apiService = ApiService();
   late Stream<List<Incident>> _incidentsStream;
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
     _incidentsStream = _apiService.getIncidentsStream();
+  }
+
+  IconData _getIconForType(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('flood')) return LucideIcons.waves;
+    if (t.contains('heat')) return LucideIcons.thermometerSun;
+    if (t.contains('accident')) return LucideIcons.car;
+    if (t.contains('fire')) return LucideIcons.flame;
+    if (t.contains('power')) return LucideIcons.zap;
+    return LucideIcons.alertTriangle;
   }
 
   Color _getSeverityColor(String severity) {
@@ -108,7 +120,7 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Action Buttons Row
+                  // Action Buttons Row (Side-by-Side)
                   Row(
                     children: [
                       Expanded(
@@ -126,11 +138,22 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
                               elevation: 2,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            child: const Text('Show Simulations'),
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Show Simulations',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -138,7 +161,7 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                       Expanded(
                         child: SizedBox(
                           height: 52,
-                          child: OutlinedButton(
+                          child: ElevatedButton(
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -146,18 +169,24 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                                 ),
                               );
                             },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.grey, width: 1),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            child: Text(
-                              'Resource Allocation',
-                              style: AppTextStyles.body.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Resource Allocation',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ),
@@ -167,6 +196,34 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  // Dynamic Category Filters
+                  StreamBuilder<List<Incident>>(
+                    stream: _incidentsStream,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+                      
+                      final incidents = snapshot.data!;
+                      final types = incidents.map((i) => i.type).toSet().toList();
+                      types.sort();
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterChip('All', LucideIcons.layers),
+                              ...types.map((type) => _buildFilterChip(
+                                type[0].toUpperCase() + type.substring(1).toLowerCase(), 
+                                _getIconForType(type)
+                              )),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
                   // Incidents Content
                   _buildIncidentsContent(snapshot),
                   const SizedBox(height: 100), // Space for bottom nav
@@ -175,6 +232,49 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, IconData icon) {
+    final isSelected = _selectedCategory.toLowerCase() == label.toLowerCase();
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = label;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : AppColors.textMuted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppTextStyles.label.copyWith(
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -204,7 +304,10 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
       );
     }
 
-    final incidents = snapshot.data ?? [];
+    final allIncidents = snapshot.data ?? [];
+    final incidents = _selectedCategory == 'All' 
+        ? allIncidents 
+        : allIncidents.where((i) => i.type.toLowerCase() == _selectedCategory.toLowerCase()).toList();
 
     if (incidents.isEmpty) {
       return Center(
@@ -217,7 +320,12 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
               const SizedBox(height: 16),
               Text('All Clear', style: AppTextStyles.h2),
               const SizedBox(height: 8),
-              Text('No active crises in your area.', style: AppTextStyles.bodyMuted),
+              Text(
+                _selectedCategory == 'All' 
+                  ? 'No active crises in your area.'
+                  : 'No active $_selectedCategory incidents.', 
+                style: AppTextStyles.bodyMuted
+              ),
             ],
           ),
         ),
@@ -301,29 +409,36 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
                   // Location and Time row
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(LucideIcons.mapPin, size: 14, color: AppColors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              incident.location.name,
-                              style: AppTextStyles.label.copyWith(
-                                color: AppColors.textMuted,
-                                fontSize: 11,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.mapPin, size: 14, color: AppColors.textMuted),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  incident.location.name,
+                                  style: AppTextStyles.label.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Live',
+                        TimeUtils.formatTimeAgo(incident.timestamp),
                         style: AppTextStyles.bodyMuted.copyWith(
                           fontSize: 12,
                           color: AppColors.accent,

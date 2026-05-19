@@ -1,3 +1,4 @@
+from typing import List
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 from tools.firebase_tools import query_active_incidents, get_resources, assign_resource_to_incident
@@ -5,52 +6,68 @@ from tracer import tracer
 from .model_config import get_model
 import json
 
-async def optimize_resources() -> str:
+async def process_resource_allocations(payload: dict = None, **kwargs) -> str:
     """
-    Analyzes active incidents and available resources, performs trade-offs,
-    and updates Firestore allocations.
+    Commits your resource allocation decisions and trade-off rationale.
     """
-    incidents = query_active_incidents()
-    # Sort incidents by severity (HIGH > MEDIUM > LOW)
-    incidents.sort(key=lambda x: x.get('severity', 'LOW') == 'HIGH', reverse=True)
-    
-    allocations = []
-    trade_offs = []
-    
-    for inc in incidents:
-        # Determine resource needs based on type/severity
-        needed_type = "Medical" if inc['type'] in ["accident", "heatwave"] else "Fire"
-        if inc['type'] == "urban_flooding": needed_type = "Water_Management"
-        
-        # Query available resources for this type
-        available = get_resources(needed_type)
-        
-        if available:
-            # Assign the first available resource
-            res = available[0]
-            assign_resource_to_incident(res['id'], inc['id'])
-            allocations.append({
-                "resource_name": res['name'],
-                "incident_id": inc['id']
-            })
-        else:
-            # Trade-off logic (Requirement 6)
-            trade_offs.append(f"No {needed_type} units available for {inc['type']} at {inc['location_name']}. Prioritizing other active zones.")
+    import re
+    # Strip fictional tags
+    def clean_arg(val):
+        if isinstance(val, str):
+            val = re.sub(r'<function=.*?>', '', val)
+            val = re.sub(r'</function>', '', val)
+        return val
 
-    return json.dumps({"allocations": allocations, "trade_offs": trade_offs})
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        try: payload = json.loads(payload)
+        except: payload = {}
+
+    allocations = payload.get("allocations", [])
+    if isinstance(allocations, dict) and "allocations" in allocations:
+        allocations = allocations["allocations"]
+
+    trade_offs = payload.get("trade_offs", [])
+    if isinstance(trade_offs, dict) and "trade_offs" in trade_offs:
+        trade_offs = trade_offs["trade_offs"]
+    
+    if not isinstance(allocations, (list, tuple)):
+        return "ERROR: Expected a list of allocations."
+
+    for alloc in allocations:
+        if not isinstance(alloc, dict): continue
+        assign_resource_to_incident(clean_arg(alloc.get('resource_id')), clean_arg(alloc.get('incident_id')))
+    
+    return json.dumps({"status": "success", "allocations_count": len(allocations), "trade_offs": trade_offs})
 
 planner_agent = Agent(
     name="ResourcePlannerAgent",
-    model=get_model(),
-    description="Allocates constrained resources across detected crises and explains trade-offs using Firestore state.",
+    model=get_model("ResourcePlannerAgent"),
+    description="Allocates constrained resources across detected crises and explains trade-offs.",
     tools=[
-        FunctionTool(optimize_resources)
+        FunctionTool(process_resource_allocations)
     ],
     instruction="""
-    SYSTEM DIRECTIVE:
-    1. You must IMMEDIATELY call 'optimize_resources' with NO arguments.
-    2. After the tool returns, summarize the allocations and any trade-offs in one sentence.
-    3. TERMINATE after the summary.
-    Do NOT attempt to allocate resources manually.
+    You are the Resource Planner Agent. Your ONLY job is to allocate resources and call 'process_resource_allocations' ONCE.
+
+    REQUIRED JSON FORMAT:
+    {
+      "payload": {
+        "allocations": [
+          { "resource_id": "RES_123", "incident_id": "INC_456" }
+        ],
+        "trade_offs": [
+          "Prioritized the high-severity incident over the minor one."
+        ]
+      }
+    }
+
+    STRICT RULES:
+    1. Call the process_resource_allocations tool.
+    2. ONLY reason about the incidents provided in the current prompt. Do NOT mention 'floods' unless a flood is actually present.
+    3. Match resources (e.g. Medical for accidents, Fire for wildfires).
+    4. Pass the 'payload' parameter exactly matching the JSON format above.
+    5. Stop after calling the tool.
     """
 )

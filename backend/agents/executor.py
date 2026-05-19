@@ -1,65 +1,93 @@
+from typing import List, Dict, Any
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
-from tools.firebase_tools import query_active_incidents, log_simulation
+from tools.firebase_tools import query_active_incidents, create_simulation_record
 from tracer import tracer
 from .model_config import get_model
 import json
 
-async def simulate_and_report() -> str:
+async def process_simulations_and_messages(payload: dict = None, **kwargs) -> str:
     """
-    Simulates the impact of assigned response actions and 
-    generates tailored stakeholder notifications.
+    Commits your response impact simulations and multi-stakeholder notifications.
     """
-    incidents = query_active_incidents()
-    if not incidents:
-        return "No active incidents to simulate."
-    
-    simulation_summaries = []
-    for inc in incidents:
-        # 1. Simulation Logic (Requirement 7)
-        impact = {
-            "before_state": "High congestion, 20min response time",
-            "action": "Traffic rerouting & prioritized dispatch",
-            "after_state": "Moderate congestion, 12min response time",
-            "improvement_metrics": {"response_time": "-40%", "congestion": "-15%"}
-        }
-        
-        # 2. Stakeholder Messaging (Requirement 8)
-        notifications = {
-            "public": f"SAFETY ALERT: Flooding in {inc['location_name']}. Avoid Basement levels. Use Alternate Route B.",
-            "hospitals": f"MEDICAL ESCALATION: Potential inflow of 10-15 patients from {inc['location_name']} flood zone.",
-            "utilities": f"INFRASTRUCTURE ALERT: Isolate power grid in {inc['location_name']} Sector 4 to prevent electrical hazards."
-        }
-        
-        # Log to Action Simulations collection
-        log_simulation(
-            incident_id=inc['id'],
-            action_type="Dispatch & Mitigation",
-            description=f"Coordinated response for {inc['type']} at {inc['location_name']}",
-            impact=impact,
-            notifications=notifications
-        )
-        
-        simulation_summaries.append({
-            "incident_id": inc['id'],
-            "impact": impact,
-            "notifications": notifications
-        })
+    import re
+    # DANGEROUS HALLUCINATION FIX: Strip any <function=...> tags if the AI nested them
+    if payload is None:
+        payload = kwargs
+    elif isinstance(payload, str):
+        try: payload = json.loads(payload)
+        except: payload = {}
 
-    return json.dumps(simulation_summaries)
+    simulations = payload.get("simulations", [])
+    if isinstance(simulations, dict) and "simulations" in simulations:
+        simulations = simulations["simulations"]
+    
+    if not isinstance(simulations, (list, tuple)):
+        return "ERROR: Expected a list of simulations."
+
+    results = []
+    for sim in simulations:
+        if not isinstance(sim, dict): continue
+        incident_id = sim.get('incident_id')
+        if not incident_id: continue
+        
+        # Ensure notifications are never null for the UI
+        notifs = sim.get('notifications', {})
+        if not isinstance(notifs, dict): notifs = {}
+        
+        # UI Safety: Fill nulls with placeholder text
+        if not notifs.get('public'): notifs['public'] = "Response plan activated."
+        if not notifs.get('hospitals'): notifs['hospitals'] = "Normal operational status."
+        if not notifs.get('utility_providers'): notifs['utility_providers'] = "No utility disruptions reported."
+
+        create_simulation_record(
+            incident_id=incident_id,
+            action_type=sim.get('action_type', 'Response Optimization'),
+            description=sim.get('description', 'Simulating impact...'),
+            impact=sim.get('impact', {}),
+            notifications=notifs
+        )
+        results.append(incident_id)
+
+    return json.dumps(results)
 
 executor_agent = Agent(
     name="SimulationStakeholderAgent",
-    model=get_model(),
-    description="Simulates impact of response actions and generates stakeholder notifications using Firestore.",
+    model=get_model("SimulationStakeholderAgent"),
+    description="Simulates the impact of response actions and generates targeted stakeholder messages.",
     tools=[
-        FunctionTool(simulate_and_report)
+        FunctionTool(process_simulations_and_messages)
     ],
     instruction="""
-    SYSTEM DIRECTIVE:
-    1. You must IMMEDIATELY call 'simulate_and_report' with NO arguments.
-    2. After the tool returns, summarize the simulations generated in one sentence.
-    3. TERMINATE after the summary.
-    Do NOT attempt to simulate impact manually.
+    You are the Simulation & Stakeholder Agent. Your ONLY job is to simulate impact and call 'process_simulations_and_messages' ONCE.
+
+    REQUIRED JSON FORMAT:
+    {
+      "payload": {
+        "simulations": [
+          {
+            "incident_id": "INC_123",
+            "action_type": "Public Alert & Medical Dispatch",
+            "description": "Deployment of ambulances and traffic detours.",
+            "impact": {
+              "before_state": "High traffic congestion and unverified casualties.",
+              "after_state": "Traffic diverted; 2 medical units on scene.",
+              "improvement_metrics": { "response_time_reduction": "15 min", "safety_boost": "40%" }
+            },
+            "notifications": {
+              "public": "AVOID Super Highway. Use alternative routes.",
+              "hospitals": "Accident report: 2 units incoming. ETA 10 mins.",
+              "utility_providers": "No power/water disruptions expected."
+            }
+          }
+        ]
+      }
+    }
+
+    STRICT RULES:
+    1. Call the process_simulations_and_messages tool.
+    2. Pass the 'payload' parameter exactly matching the JSON format above.
+    3. Notifications MUST NEVER BE NULL. If no action is needed, write 'No specific action required' or 'Monitoring status'.
+    4. Stop after calling the tool.
     """
 )

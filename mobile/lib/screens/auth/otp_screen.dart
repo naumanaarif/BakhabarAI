@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:pinput/pinput.dart';
 import '../../core/theme.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
+  final String verificationId;
   final Function(String name) onAuthenticated;
 
   const OtpScreen({
     Key? key,
     this.phoneNumber = '+92 300 XXXXXXX',
+    required this.verificationId,
     required this.onAuthenticated,
   }) : super(key: key);
 
@@ -16,35 +20,20 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  final TextEditingController _pinController = TextEditingController();
   bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
-    });
-  }
-
-  @override
   void dispose() {
-    for (var controller in _controllers) {
-      controller.dispose();
-    }
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
+    _pinController.dispose();
     super.dispose();
   }
 
-  void _verifyOtp() async {
-    final code = _controllers.map((c) => c.text).join();
-    if (code.length < 4) {
+  void _verifyOtp(String code) async {
+    if (code.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter the 4-digit code.'),
+          content: Text('Please enter the 6-digit code.'),
           backgroundColor: AppColors.dangerRed,
         ),
       );
@@ -52,12 +41,35 @@ class _OtpScreenState extends State<OtpScreen> {
     }
 
     setState(() => _isLoading = true);
-    // Simulate verification delay
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isLoading = false);
+    
+    try {
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: widget.verificationId,
+        smsCode: code,
+      );
 
-    if (mounted) {
-      _showNameInputDialog();
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        _showNameInputDialog();
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Invalid OTP code.'),
+          backgroundColor: AppColors.dangerRed,
+        ),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppColors.dangerRed,
+        ),
+      );
     }
   }
 
@@ -164,6 +176,30 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final defaultPinTheme = PinTheme(
+      width: 46,
+      height: 54,
+      textStyle: AppTextStyles.h1.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+    );
+
+    final focusedPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border: Border.all(color: AppColors.accent, width: 2),
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       width: double.infinity,
@@ -188,58 +224,13 @@ class _OtpScreenState extends State<OtpScreen> {
           ),
           const SizedBox(height: 48),
 
-          // OTP Inputs Grid
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(4, (index) {
-              return Container(
-                width: 56,
-                height: 52,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _focusNodes[index].hasFocus ? AppColors.accent : Colors.grey.shade300,
-                    width: _focusNodes[index].hasFocus ? 2 : 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
-                ),
-                child: TextField(
-                  controller: _controllers[index],
-                  focusNode: _focusNodes[index],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  style: AppTextStyles.h1.copyWith(fontSize: 20),
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  onChanged: (value) {
-                    if (value.isNotEmpty) {
-                      if (index < 3) {
-                        _focusNodes[index + 1].requestFocus();
-                      } else {
-                        _focusNodes[index].unfocus();
-                        _verifyOtp(); // Auto-verify on last digit
-                      }
-                    } else if (index > 0) {
-                      _focusNodes[index - 1].requestFocus();
-                    }
-                  },
-                ),
-              );
-            }),
+          // Pinput Widget
+          Pinput(
+            length: 6,
+            controller: _pinController,
+            defaultPinTheme: defaultPinTheme,
+            focusedPinTheme: focusedPinTheme,
+            onCompleted: (pin) => _verifyOtp(pin),
           ),
           const SizedBox(height: 48),
 
@@ -248,7 +239,7 @@ class _OtpScreenState extends State<OtpScreen> {
             width: 200,
             height: 52,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _verifyOtp,
+              onPressed: _isLoading ? null : () => _verifyOtp(_pinController.text),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 shape: RoundedRectangleBorder(

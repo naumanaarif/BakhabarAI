@@ -73,3 +73,10 @@ node_modules/
 
 package_submission.py
 antigravity_submission_logs.zip
+
+# Firebase
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules
+bug_images

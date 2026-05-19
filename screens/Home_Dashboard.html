@@ -150,7 +150,7 @@
 <div class="absolute bottom-md left-md right-md bg-white/85 backdrop-blur-[12px] border border-white/20 rounded-[12px] p-sm shadow-sm flex items-center justify-between">
 <div class="flex items-center gap-xs">
 <span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">my_location</span>
-<span class="font-label-md text-label-md text-on-surface">Monitoring Zone Alpha</span>
+<span id="location-name" class="font-label-md text-label-md text-on-surface">Monitoring Zone Alpha</span>
 </div>
 <div class="flex items-center gap-base">
 <span class="w-2 h-2 rounded-full bg-error"></span>
@@ -252,4 +252,57 @@
 <span class="font-label-sm text-label-sm mt-1">Logs</span>
 </a>
 </nav>
+<script>
+    async function updateLocation() {
+        const locationSpan = document.getElementById('location-name');
+        if (!navigator.geolocation) {
+            locationSpan.textContent = "Location not supported";
+            return;
+        }
+
+        locationSpan.textContent = "Locating...";
+
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            try {
+                // Using Nominatim API for reverse geocoding (OpenStreetMap)
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`, {
+                    headers: {
+                        'Accept-Language': 'en'
+                    }
+                });
+                const data = await response.json();
+                
+                // Prioritize specific area names
+                const area = data.address.suburb || 
+                             data.address.neighbourhood || 
+                             data.address.residential || 
+                             data.address.village || 
+                             data.address.city_district || 
+                             data.address.town || 
+                             data.address.city || 
+                             "Current Area";
+                
+                locationSpan.textContent = `Monitoring ${area}`;
+                
+                // Log coordinates for debugging/future use
+                console.log(`User coordinates: ${latitude}, ${longitude}`);
+                
+            } catch (error) {
+                console.error("Error fetching location name:", error);
+                locationSpan.textContent = `Monitoring ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+            }
+        }, (error) => {
+            console.error("Error getting geolocation:", error);
+            if (error.code === 1) {
+                locationSpan.textContent = "Location Access Denied";
+            } else {
+                locationSpan.textContent = "Location Error";
+            }
+        });
+    }
+
+    // Call updateLocation when DOM is ready
+    document.addEventListener('DOMContentLoaded', updateLocation);
+</script>
 </body></html>

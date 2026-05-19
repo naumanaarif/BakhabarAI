@@ -66,3 +66,9 @@ def log_simulation(incident_id: str, action_type: str, description: str, impact:
     Logs a response simulation and stakeholder messages to Firestore.
     """
     FirebaseService.log_action_simulation(incident_id, action_type, description, impact, notifications)
+
+def create_simulation_record(incident_id: str, action_type: str, description: str, impact: Dict[str, Any], notifications: Dict[str, str]):
+    """
+    Alias for log_simulation to maintain compatibility with the Simulation Agent.
+    """
+    return log_simulation(incident_id, action_type, description, impact, notifications)

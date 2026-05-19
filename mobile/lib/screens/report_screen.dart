@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../core/theme.dart';
 import '../core/auth_provider.dart';
 import '../services/api_service.dart';
@@ -16,12 +20,18 @@ class ReportScreen extends ConsumerStatefulWidget {
 class _ReportScreenState extends ConsumerState<ReportScreen> {
   final ApiService _apiService = ApiService();
   bool _isLoading = false;
+  Timer? _debounce;
 
   // Form Fields
   String _selectedType = 'Flood';
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
+  String _selectedLocation = '';
   
+  // Media Fields
+  XFile? _selectedMedia;
+  final ImagePicker _picker = ImagePicker();
+
   final List<String> _crisisTypes = [
     'Flood',
     'Heatwave',
@@ -35,12 +45,35 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   void dispose() {
     _descriptionController.dispose();
     _locationController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _pickMedia() async {
+    final XFile? media = await _picker.pickImage(source: ImageSource.gallery);
+    // You could also add pickVideo
+    if (media != null) {
+      setState(() {
+        _selectedMedia = media;
+      });
+    }
+  }
+
+  Future<String?> _uploadMedia(XFile media) async {
+    try {
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${media.name}';
+      final ref = FirebaseStorage.instance.ref().child('incident_media').child(fileName);
+      final uploadTask = await ref.putFile(File(media.path));
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e) {
+      debugPrint("Media upload failed: $e");
+      return null;
+    }
   }
 
   void _submitIncident() async {
     final description = _descriptionController.text.trim();
-    final locationName = _locationController.text.trim();
+    final locationName = _selectedLocation.trim();
 
     if (description.isEmpty || locationName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,20 +88,32 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Simulate submission to the backend SignalCollectorAgent
-      await _apiService.submitReport('$locationName: $_selectedType - $description');
+      String? mediaUrl;
+      if (_selectedMedia != null) {
+        mediaUrl = await _uploadMedia(_selectedMedia!);
+      }
+
+      // Submit to backend
+      await _apiService.submitReport(
+        '$locationName: $_selectedType - $description',
+        mediaUrl: mediaUrl,
+      );
       
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _selectedMedia = null;
+          _selectedLocation = '';
+          _descriptionController.clear();
+          // Note: The Autocomplete controller is internal to fieldViewBuilder
+          // But since we clear _selectedLocation and call setState, it's consistent
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Incident submitted to AI pipeline successfully!'),
             backgroundColor: AppColors.successGreen,
           ),
         );
-        // Clear fields
-        _descriptionController.clear();
-        _locationController.clear();
       }
     } catch (e) {
       if (mounted) {
@@ -134,44 +179,7 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Draft Warning Alert
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.severityMedium.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.severityMedium.withOpacity(0.3)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.alertCircle, color: AppColors.severityMedium, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Unsubmitted Draft',
-                            style: AppTextStyles.label.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.severityMedium,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'You have a draft report from 2 hrs ago.',
-                            style: AppTextStyles.bodyMuted.copyWith(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+
 
               // Form fields
               Text(
@@ -214,30 +222,101 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Location Input
+              // Location Autocomplete
               Text('Location *', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              TextField(
-                controller: _locationController,
-                style: AppTextStyles.body,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Sector G-10, Islamabad',
-                  prefixIcon: const Icon(LucideIcons.mapPin, color: AppColors.textMuted, size: 18),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.accent, width: 2),
-                  ),
-                ),
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) async {
+                  final query = textEditingValue.text.trim();
+                  if (query.length < 3) {
+                    return const Iterable<String>.empty();
+                  }
+
+                  // Debounce API calls
+                  final completer = Completer<Iterable<String>>();
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 500), () async {
+                    try {
+                      final results = await _apiService.getPlacePredictions(query);
+                      completer.complete(results);
+                    } catch (e) {
+                      completer.complete(const Iterable<String>.empty());
+                    }
+                  });
+                  return completer.future;
+                },
+                onSelected: (String selection) {
+                  setState(() {
+                    _selectedLocation = selection;
+                  });
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    style: AppTextStyles.body,
+                    onChanged: (val) {
+                      _selectedLocation = val;
+                      setState(() {}); // Trigger rebuild for X icon visibility
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Sector G-10, Islamabad',
+                      prefixIcon: const Icon(LucideIcons.mapPin, color: AppColors.textMuted, size: 18),
+                      suffixIcon: controller.text.isNotEmpty 
+                        ? IconButton(
+                            icon: const Icon(LucideIcons.x, size: 18, color: AppColors.textMuted),
+                            onPressed: () {
+                              controller.clear();
+                              setState(() {
+                                _selectedLocation = '';
+                              });
+                            },
+                          )
+                        : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                      ),
+                    ),
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Container(
+                        width: MediaQuery.of(context).size.width - 40,
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemCount: options.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final option = options.elementAt(index);
+                            return ListTile(
+                              leading: const Icon(LucideIcons.mapPin, color: AppColors.textMuted, size: 18),
+                              title: Text(option, style: AppTextStyles.body),
+                              onTap: () {
+                                onSelected(option);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
 
@@ -272,35 +351,37 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               Text('Media Upload (Images/Videos)', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Media picker simulated successfully.'),
-                      backgroundColor: AppColors.successGreen,
-                    ),
-                  );
-                },
+                onTap: _pickMedia,
                 child: Container(
-                  height: 120,
+                  height: 140,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                    image: _selectedMedia != null
+                        ? DecorationImage(
+                            image: FileImage(File(_selectedMedia!.path)),
+                            fit: BoxFit.cover,
+                            colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
+                          )
+                        : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(LucideIcons.plusCircle, color: AppColors.accent, size: 32),
+                      Icon(
+                        _selectedMedia != null ? LucideIcons.checkCircle : LucideIcons.plusCircle, 
+                        color: _selectedMedia != null ? AppColors.successGreen : AppColors.accent, 
+                        size: 32
+                      ),
                       const SizedBox(height: 8),
                       Text(
-                        'Upload photos or capture live video',
-                        style: AppTextStyles.bodyMuted.copyWith(fontSize: 13),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Supports PNG, JPG, MP4 (Max 15MB)',
-                        style: AppTextStyles.labelMuted.copyWith(fontSize: 11),
+                        _selectedMedia != null ? 'Media Selected (Tap to change)' : 'Upload photos or capture live video',
+                        style: AppTextStyles.bodyMuted.copyWith(
+                          fontSize: 13,
+                          color: _selectedMedia != null ? Colors.white : AppColors.textMuted,
+                        ),
                       ),
                     ],
                   ),

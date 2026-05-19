@@ -22,8 +22,8 @@ class ApiService {
     );
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 180),
+      receiveTimeout: const Duration(seconds: 180),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -70,7 +70,7 @@ class ApiService {
     };
   }
 
-  // REAL-TIME INCIDENTS STREAM
+  // REAL-TIME INCIDENTS STREAM (Active Only)
   Stream<List<Incident>> getIncidentsStream() {
     return _firestore
         .collection('incidents')
@@ -88,6 +88,20 @@ class ApiService {
         return b.timestamp!.compareTo(a.timestamp!);
       });
       return list;
+    });
+  }
+
+  // REAL-TIME INCIDENT HISTORY STREAM (All incidents)
+  Stream<List<Incident>> getIncidentHistoryStream() {
+    return _firestore
+        .collection('incidents')
+        .orderBy('timestamp', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Incident.fromJson(_mapFirestoreToIncidentJson(doc));
+      }).toList();
     });
   }
 
@@ -168,14 +182,18 @@ class ApiService {
     });
   }
 
-  Future<void> submitReport(String message, {double? lat, double? lng}) async {
+  Future<void> submitReport(String message, {double? lat, double? lng, String? mediaUrl}) async {
     try {
       // Note: Endpoint is baseUrl + '/report' -> /api/report
-      await _dio.post('/report', data: {
+      final data = {
         'message': message,
         'lat': lat ?? 33.6844,
         'lng': lng ?? 73.0479,
-      });
+      };
+      if (mediaUrl != null) {
+        data['media_url'] = mediaUrl;
+      }
+      await _dio.post('/report', data: data);
     } on DioException catch (e) {
       debugPrint('Error submitting report: ${e.message}');
       throw Exception('Failed to submit report: ${e.response?.data['message'] ?? e.message}');
@@ -196,6 +214,20 @@ class ApiService {
     } catch (e) {
       debugPrint('Unexpected error running scenario: $e');
       throw Exception('An unexpected error occurred during simulation.');
+    }
+  }
+
+  Future<List<String>> getPlacePredictions(String query) async {
+    try {
+      final response = await _dio.get('/places/autocomplete', queryParameters: {'q': query});
+      if (response.data != null && response.data['predictions'] != null) {
+        final predictions = response.data['predictions'] as List;
+        return predictions.map((p) => p['description'] as String).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching places: $e');
+      return [];
     }
   }
 }
