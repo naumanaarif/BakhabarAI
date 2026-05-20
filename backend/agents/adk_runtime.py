@@ -65,24 +65,31 @@ def _clean_event_text(text: str) -> str:
     return cleaned[:200] if cleaned else "Processing…"
 
 
-async def _consume_agent_events(agent, ctx) -> str:
+async def _consume_agent_events(
+    agent,
+    ctx,
+    max_tool_calls: int = None,   # NEW: override max tool calls (used for max_rounds)
+    max_events: int = None,       # NEW: override max total events
+) -> str:
     """
     Streams events from a running agent until a terminal condition or tool cap.
-    - Breaks immediately after the FIRST tool response (all our tools are single-call).
-    - Caps at MAX_EVENTS total events to prevent infinite loops on text-only LLM replies.
-    Returns final text output.
+
+    - Breaks after the FIRST tool response if max_tool_calls=1 (one‑shot agents).
+    - Caps total events and text‑only events to prevent infinite LLM chatter.
+    - Returns final text output.
     """
     out = ""
     tool_count = 0
-    MAX_TOOLS = 3
-    MAX_EVENTS = 30           # Hard cap — prevents infinite event streams
-    MAX_TEXT_ONLY = 6         # Break if LLM keeps chatting without calling a tool
+    # Default limits (can be overridden for stricter control)
+    MAX_TOOLS = max_tool_calls if max_tool_calls is not None else 3
+    MAX_EVENTS = max_events if max_events is not None else 30
+    MAX_TEXT_ONLY = 6                 # break if LLM keeps chatting without calling a tool
     event_count = 0
     text_only_events = 0
     seen_hashes: set = set()
     got_tool_response = False
 
-    print(f"[ADK] ▶ Starting event stream for: {agent.name}")
+    print(f"[ADK] ▶ Starting event stream for: {agent.name} (max_tool_calls={MAX_TOOLS}, max_events={MAX_EVENTS})")
 
     async with Aclosing(agent.run_async(ctx)) as agen:
         try:
@@ -100,12 +107,18 @@ async def _consume_agent_events(agent, ctx) -> str:
                     for part in event.content.parts:
                         if hasattr(part, "call") and part.call:
                             h = f"{part.call.name}:{json.dumps(part.call.args, sort_keys=True, default=str)}"
+                            # ── FIX 1: count ALL calls toward cap, not just unique ones ──
+                            # Duplicates were silently skipped, so tool_count never reached MAX_TOOLS
+                            tool_count += 1
                             if h not in seen_hashes:
                                 seen_hashes.add(h)
-                                tool_count += 1
                                 has_tool_part = True
                                 tool_info.append(f"Calling: {part.call.name}")
                                 print(f"[ADK]   🔧 [{agent.name}] Tool call #{tool_count}: {part.call.name}")
+                            else:
+                                # Duplicate: LLM is looping — log and count but don’t re-execute
+                                print(f"[ADK]   ⚠ [{agent.name}] DUPLICATE tool call #{tool_count} suppressed: {part.call.name}")
+                                has_tool_part = True
                         elif hasattr(part, "response") and part.response:
                             got_tool_response = True
                             terminal = True
@@ -151,11 +164,15 @@ async def _consume_agent_events(agent, ctx) -> str:
                     break
                 if text_only_events >= MAX_TEXT_ONLY:
                     print(f"[ADK] ⚠ [{agent.name}] Text-only cap reached ({MAX_TEXT_ONLY}) — LLM not calling tools, exiting.")
-                    tracer.log(agent_name=agent.name, action="Warning: Agent produced text without calling tool — forcing exit.", input_data={}, output_data={}, confidence=0.5)
+                    tracer.log(agent_name=agent.name,
+                               action="Warning: Agent produced text without calling tool — forcing exit.",
+                               input_data={}, output_data={}, confidence=0.5)
                     break
                 if event_count >= MAX_EVENTS:
                     print(f"[ADK] ⚠ [{agent.name}] Max event cap reached ({MAX_EVENTS}) — forcing exit.")
-                    tracer.log(agent_name=agent.name, action="Warning: Max event limit hit — forced exit.", input_data={}, output_data={}, confidence=0.5)
+                    tracer.log(agent_name=agent.name,
+                               action="Warning: Max event limit hit — forced exit.",
+                               input_data={}, output_data={}, confidence=0.5)
                     break
 
         except asyncio.CancelledError:
@@ -165,23 +182,36 @@ async def _consume_agent_events(agent, ctx) -> str:
     return out
 
 
-async def run_agent_standalone(agent, input_text: str) -> str:
+async def run_agent_standalone(
+    agent,
+    input_text: str,
+    max_tool_calls: int = None,   # NEW: e.g. 1 or 2 to force one‑shot behaviour
+    max_events: int = None        # NEW: optional stricter event cap
+) -> str:
     """
     Runs a single ADK agent, with retry + Gemini fallback on rate limits.
     All agent events are logged to the global tracer for the /api/logs endpoint.
+
+    Parameters:
+        max_tool_calls: if set, overrides the default maximum number of tool calls
+                        (stops agent after N tool invocations).
+        max_events:     if set, overrides the default maximum total event count.
     """
     from google.genai import types
 
     print(f"[ADK] >> Running: {agent.name}")
-    from .model_config import set_key_for_agent
+    from .model_config import set_key_for_agent, _pool_size
     set_key_for_agent(agent.name)
 
-    MAX_RETRIES = 3
-    retry_delay = 8   # Start with 8s to give Gemini quota time to reset
+    pool_sz = _pool_size() or 1
+    MAX_RETRIES = pool_sz + 1   # try every Groq slot, then 1 Gemini attempt
+    retry_delay = 1             # short wait — we have many keys to try
 
     for attempt in range(MAX_RETRIES):
         from .model_config import get_model
-        agent.model = get_model(agent.name, force_gemini=(attempt >= 2))
+        # Use Gemini only on the very last attempt (all Groq slots exhausted)
+        force_gemini = (attempt >= pool_sz)
+        agent.model = get_model(agent.name, force_gemini=force_gemini)
 
         ctx = await create_root_context(agent)
 
@@ -205,8 +235,13 @@ async def run_agent_standalone(agent, input_text: str) -> str:
         t0 = time.time()
         try:
             final_output = await asyncio.wait_for(
-                _consume_agent_events(agent, ctx),
-                timeout=60.0,
+                _consume_agent_events(
+                    agent,
+                    ctx,
+                    max_tool_calls=max_tool_calls,
+                    max_events=max_events
+                ),
+                timeout=120.0,
             )
             elapsed = time.time() - t0
             print(f"[ADK] OK {agent.name} finished in {elapsed:.1f}s (attempt {attempt + 1})")
@@ -221,7 +256,9 @@ async def run_agent_standalone(agent, input_text: str) -> str:
 
         except asyncio.TimeoutError:
             print(f"[ADK] TIMEOUT {agent.name} (attempt {attempt + 1})")
-            tracer.log(agent_name=agent.name, action=f"Timeout on attempt {attempt + 1} -- retrying...", input_data={}, output_data={}, confidence=0.3)
+            tracer.log(agent_name=agent.name,
+                       action=f"Timeout on attempt {attempt + 1} -- retrying...",
+                       input_data={}, output_data={}, confidence=0.3)
             if attempt < MAX_RETRIES - 1:
                 from .model_config import rotate_groq_key
                 rotate_groq_key(agent.name)
@@ -232,7 +269,9 @@ async def run_agent_standalone(agent, input_text: str) -> str:
 
         except asyncio.CancelledError:
             print(f"[ADK] CANCELLED {agent.name} (attempt {attempt + 1})")
-            tracer.log(agent_name=agent.name, action=f"Cancelled on attempt {attempt + 1} -- retrying...", input_data={}, output_data={}, confidence=0.3)
+            tracer.log(agent_name=agent.name,
+                       action=f"Cancelled on attempt {attempt + 1} -- retrying...",
+                       input_data={}, output_data={}, confidence=0.3)
             if attempt < MAX_RETRIES - 1:
                 from .model_config import rotate_groq_key
                 rotate_groq_key(agent.name)
@@ -246,14 +285,18 @@ async def run_agent_standalone(agent, input_text: str) -> str:
             is_rate_limit = "rate_limit" in err.lower() or "429" in err or "quota" in err.lower()
             if is_rate_limit:
                 print(f"[ADK] RATE LIMIT on attempt {attempt + 1}. Waiting {retry_delay}s...")
-                tracer.log(agent_name=agent.name, action=f"Rate limit -- rotating key, waiting {retry_delay}s", input_data={}, output_data={}, confidence=0.2)
+                tracer.log(agent_name=agent.name,
+                           action=f"Rate limit -- rotating key, waiting {retry_delay}s",
+                           input_data={}, output_data={}, confidence=0.2)
                 from .model_config import rotate_groq_key
                 rotate_groq_key(agent.name)
                 await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 60)
+                retry_delay = min(retry_delay * 2, 10)  # cap at 10s, fail fast
             else:
                 print(f"[ADK] ❌ ERROR in {agent.name} (attempt {attempt+1}): {type(e).__name__}: {e}")
-                tracer.log(agent_name=agent.name, action=f"Error ({type(e).__name__}): {str(e)[:200]}", input_data={}, output_data={}, confidence=0.0)
+                tracer.log(agent_name=agent.name,
+                           action=f"Error ({type(e).__name__}): {str(e)[:200]}",
+                           input_data={}, output_data={}, confidence=0.0)
                 raise
 
     raise Exception(f"{agent.name} failed after {MAX_RETRIES} attempts.")

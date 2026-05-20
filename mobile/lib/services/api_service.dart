@@ -62,8 +62,11 @@ class ApiService {
         'lat': geo.latitude,
         'lng': geo.longitude,
       },
-      'expected_duration_hours': prediction?['expected_duration_hours'],
+      // expected_duration_hours is stored at the root of the incident doc
+      // Use num? cast then toInt() — Firestore returns numbers as num (double)
+      'expected_duration_hours': (data['expected_duration_hours'] as num?)?.toInt(),
       'peak_impact_time': prediction?['peak_impact_time'],
+      'title': data['title'] ?? '',
       'signal_sources': data['signal_sources'] is List 
           ? List<String>.from(data['signal_sources']) 
           : [],

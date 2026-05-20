@@ -18,7 +18,7 @@ async def main():
     start_time = time.time()
     try:
         # Trigger the full ADK pipeline
-        result = await run_crisis_simulation()
+        result = await run_crisis_simulation(scenario_data={"trigger_type": "weather"})
         
         print("\n✅ Pipeline Execution Complete!")
         print(f"Time elapsed: {int(time.time() - start_time)} seconds")

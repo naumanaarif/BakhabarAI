@@ -51,10 +51,11 @@ class Incident {
       location: Location.fromJson(json['location']),
       severity: json['severity'] as String,
       confidence: (json['confidence'] as num).toDouble(),
-      affectedPopulation: json['affected_population'] as int,
+      affectedPopulation: (json['affected_population'] as num?)?.toInt() ?? 0,
       status: json['status'] as String,
       timestamp: json['timestamp'] != null ? DateTime.parse(json['timestamp']) : null,
-      expectedDurationHours: json['expected_duration_hours'] as int?,
+      // Firestore returns numbers as num (double) — always use toInt()
+      expectedDurationHours: (json['expected_duration_hours'] as num?)?.toInt(),
       peakImpactTime: json['peak_impact_time'] as String?,
       signalSources: json['signal_sources'] != null 
           ? List<String>.from(json['signal_sources'])

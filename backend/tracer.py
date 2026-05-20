@@ -25,17 +25,23 @@ class AgentTracer:
 
         self.traces.append(trace_data)
 
-        # PERSIST TO FIREBASE for Mobile App
-        try:
-            FirebaseService.add_agent_log(
-                agent_name=agent_name,
-                action=action,
-                input_data={}, # Keep empty to avoid JSON clutter in UI
-                output_data={}, # Keep empty to avoid JSON clutter in UI
-                confidence=confidence
-            )
-        except Exception as e:
-            print(f"Error persisting log to Firebase: {e}")
+        # PERSIST TO FIREBASE for Mobile App in background thread to avoid blocking event loop
+        import threading
+        def save_log():
+            try:
+                FirebaseService.add_agent_log(
+                    agent_name=agent_name,
+                    action=action,
+                    input_data={}, # Keep empty to avoid JSON clutter in UI
+                    output_data={}, # Keep empty to avoid JSON clutter in UI
+                    confidence=confidence
+                )
+            except Exception as e:
+                print(f"Error persisting log to Firebase: {e}")
+        
+        t = threading.Thread(target=save_log)
+        t.daemon = True
+        t.start()
 
     def export(self, path: str = "traces/agent_trace.json"):
         os.makedirs(os.path.dirname(path), exist_ok=True)

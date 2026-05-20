@@ -22,7 +22,10 @@ if GROQ_API_KEYS:
     print(f"DEBUG: Initializing Groq pool with {len(GROQ_API_KEYS)} independent-account keys...")
     for i, key in enumerate(GROQ_API_KEYS):
         if not key or len(key) < 10:
-            print(f"DEBUG: Skipping invalid key at index {i}")
+            print(f"DEBUG: Skipping empty key at index {i}")
+            continue
+        if not key.startswith("gsk_"):
+            print(f"DEBUG: Skipping malformed key at index {i} — must start with 'gsk_' (got: {key[:6]}...)")
             continue
         try:
             model_instance = LiteLlm(
@@ -53,7 +56,8 @@ _AGENT_SLOT = {
     "ReporterAgent":              4,  # key 5
     # key 6 (index 5) is the rotation spare
 }
-_SPARE_SLOT = 5  # index of the spare key used on rate-limit rotation
+# _SPARE_SLOT is the last slot in the pool (always valid, dynamic)
+_SPARE_SLOT = max(0, len(groq_model_pool) - 1)
 
 # Per-agent rotation offset (starts at 0, increments to spare on 429)
 _agent_rotation: dict = {}
@@ -68,26 +72,20 @@ def _pool_size() -> int:
 
 def rotate_groq_key(agent_name: str = None):
     """
-    On a 429 for a specific agent, rotate that agent's slot to the spare key.
-    If the spare is also exhausted, cycles through remaining slots.
+    On a 429 rotate the agent through ALL pool slots (round-robin) before
+    falling back to Gemini.  With 6 keys this gives 5 retries on Groq alone.
     """
     global current_key_index
     if not groq_model_pool:
         return
 
-    if agent_name and agent_name in _AGENT_SLOT:
-        current = _agent_rotation.get(agent_name, _AGENT_SLOT[agent_name])
-        spare = _SPARE_SLOT % _pool_size()
-        if current != spare:
-            _agent_rotation[agent_name] = spare
-            print(f"DEBUG: Agent '{agent_name}' rotated to spare slot {spare}")
-        else:
-            next_slot = (current + 1) % _pool_size()
-            _agent_rotation[agent_name] = next_slot
-            print(f"DEBUG: Agent '{agent_name}' spare exhausted, cycling to slot {next_slot}")
-
-        key_idx = _agent_rotation[agent_name] % len(GROQ_API_KEYS)
+    if agent_name:
+        current = _agent_rotation.get(agent_name, _AGENT_SLOT.get(agent_name, 0))
+        next_slot = (current + 1) % _pool_size()
+        _agent_rotation[agent_name] = next_slot
+        key_idx = next_slot % len(GROQ_API_KEYS)
         os.environ["GROQ_API_KEY"] = GROQ_API_KEYS[key_idx]
+        print(f"DEBUG: Agent '{agent_name}' rotated to slot {next_slot} (key ...{GROQ_API_KEYS[key_idx][-6:]})")
     else:
         current_key_index = (current_key_index + 1) % _pool_size()
         key_idx = current_key_index % len(GROQ_API_KEYS)
@@ -104,7 +102,7 @@ def get_model(agent_name: str = None, force_gemini: bool = False):
       2. Groq    -- if PREFER_GROQ=True AND pool is available
       3. Gemini  -- default fallback
     """
-    prefer_groq = os.getenv("PREFER_GROQ", "False").lower() == "true"
+    prefer_groq = os.getenv("PREFER_GROQ", "True").lower() == "true"
 
     if force_gemini or not prefer_groq or not groq_model_pool:
         if force_gemini:
