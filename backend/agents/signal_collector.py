@@ -88,11 +88,21 @@ async def process_signal_evaluations(payload: Dict[str, Any] = None, **kwargs) -
                     current_conf = float(inc_doc.to_dict().get("confidence_score", 0.3))
                     new_conf = round(min(0.99, current_conf + (1.0 - current_conf) * 0.4), 2)
                     inc_ref.update({"confidence_score": new_conf, "last_updated": firestore.SERVER_TIMESTAMP})
-            elif new_data:
-                if hasattr(new_data, 'type'): inc_type, inc_sev, inc_loc = new_data.type, new_data.severity, new_data.location_name
-                elif isinstance(new_data, dict): inc_type, inc_sev, inc_loc = new_data.get('type', 'emergency'), new_data.get('severity', 'MEDIUM'), new_data.get('location_name', 'Unknown')
-                else: inc_type, inc_sev, inc_loc = 'emergency', 'MEDIUM', 'Unknown'
-                incident_id = create_incident(incident_type=inc_type, severity=inc_sev, confidence=credibility, location_name=inc_loc, lat=33.6844, lng=73.0479, signal_source="Citizen Report")
+                # Read the signal's actual lat/lng from Firestore instead of hardcoding Islamabad
+                _sig_lat, _sig_lng = 33.6844, 73.0479  # fallback
+                try:
+                    _sig_doc = db.collection("signals").document(signal_id).get()
+                    if _sig_doc.exists:
+                        _geo = _sig_doc.to_dict().get("location")
+                        if hasattr(_geo, 'latitude'):
+                            _sig_lat, _sig_lng = _geo.latitude, _geo.longitude
+                        # Also try to get location_name from metadata if not in new_data
+                        _meta = _sig_doc.to_dict().get("metadata", {})
+                        if _meta.get("location_name") and inc_loc in ('Unknown', ''):
+                            inc_loc = _meta["location_name"]
+                except Exception as _e:
+                    print(f"DEBUG: Could not read signal location for {signal_id}: {_e}")
+                incident_id = create_incident(incident_type=inc_type, severity=inc_sev, confidence=credibility, location_name=inc_loc, lat=_sig_lat, lng=_sig_lng, signal_source="Citizen Report")
             else:
                 print(f"DEBUG: Signal {signal_id} verified but no incident mapping or data provided. Skipping incident creation.")
                 status = 'noise' # Revert to noise if we can't do anything with it

@@ -281,35 +281,64 @@ class _SimulationScreenState extends State<SimulationScreen> {
     Incident incident,
   ) {
     final impact = sim.impactPrediction;
-    final beforeState =
-        impact['before_state'] ?? 'Baseline: High impact without intervention';
-    final afterState =
-        impact['after_state'] ??
-        'Predicted Result: Managed impact and restored flow';
+
+    // Format a raw slug like 'fire_extinguished' or 'power_outage' into readable text
+    String humanize(String? raw, String fallback) {
+      if (raw == null || raw.trim().isEmpty) return fallback;
+      final s = raw.trim();
+      // If it looks like a raw snake_case slug with no spaces (likely LLM shorthand)
+      if (!s.contains(' ') && s.contains('_')) {
+        return s.replaceAll('_', ' ').split(' ').map((w) {
+          return w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w;
+        }).join(' ');
+      }
+      return s;
+    }
+
+    // Add units to bare numeric metric values
+    String fmtMetric(String key, dynamic val) {
+      final s = val.toString().trim();
+      // If it's a pure number, append unit based on key
+      if (RegExp(r'^\d+$').hasMatch(s)) {
+        if (key.contains('time') || key.contains('min')) return '$s min';
+        if (key.contains('boost') || key.contains('percent')) return '$s%';
+        return s;
+      }
+      return s;
+    }
+
+    // Format incident type: POWER_OUTAGE → Power Outage
+    String fmtType(String t) {
+      return t.replaceAll('_', ' ').split(' ').map((w) {
+        return w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}' : w;
+      }).join(' ');
+    }
+
+    final beforeState = humanize(
+      impact['before_state']?.toString(),
+      'Baseline: High impact without intervention',
+    );
+    final afterState = humanize(
+      impact['after_state']?.toString(),
+      'Predicted Result: Managed impact and restored flow',
+    );
     final improvement = impact['improvement_metrics'] ?? {};
 
     IconData getCrisisIcon(String type) {
-      switch (type.toLowerCase()) {
-        case 'flood':
-          return LucideIcons.waves;
-        case 'heatwave':
-          return LucideIcons.thermometerSun;
-        case 'accident':
-          return LucideIcons.car;
-        case 'power outage':
-        case 'power_outage':
-          return LucideIcons.zap;
-        case 'protest':
-          return LucideIcons.megaphone;
-        case 'disease':
-          return LucideIcons.activity;
-        default:
-          return LucideIcons.alertTriangle;
+      switch (type.toLowerCase().replaceAll('_', ' ')) {
+        case 'flood':         return LucideIcons.waves;
+        case 'heatwave':      return LucideIcons.thermometerSun;
+        case 'accident':      return LucideIcons.car;
+        case 'power outage':  return LucideIcons.zap;
+        case 'fire':          return LucideIcons.flame;
+        case 'protest':       return LucideIcons.megaphone;
+        case 'disease':       return LucideIcons.activity;
+        default:              return LucideIcons.alertTriangle;
       }
     }
 
     final timeStr =
-        "${sim.timestamp.day} ${_getMonthName(sim.timestamp.month)} ${sim.timestamp.hour.toString().padLeft(2, '0')}:${sim.timestamp.minute.toString().padLeft(2, '0')}";
+        '${sim.timestamp.day} ${_getMonthName(sim.timestamp.month)} ${sim.timestamp.hour.toString().padLeft(2, '0')}:${sim.timestamp.minute.toString().padLeft(2, '0')}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,27 +374,32 @@ class _SimulationScreenState extends State<SimulationScreen> {
                 child: Icon(
                   getCrisisIcon(incident.type),
                   color: isLatest ? AppColors.accent : AppColors.textMuted,
-                  size: 24,
+                  size: 22,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Type + badge on same row — badge shrinks, type gets remaining space
                     Row(
                       children: [
-                        Text(
-                          incident.type.toUpperCase(),
-                          style: AppTextStyles.h2.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            fmtType(incident.type).toUpperCase(),
+                            style: AppTextStyles.h2.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
+                            horizontal: 6,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
@@ -375,10 +409,10 @@ class _SimulationScreenState extends State<SimulationScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            isLatest ? 'LATEST' : 'PREVIOUS',
+                            isLatest ? 'LATEST' : 'PREV',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 9,
+                              fontSize: 8,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -401,6 +435,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                               fontSize: 12,
                             ),
                             overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -408,6 +443,7 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -418,9 +454,9 @@ class _SimulationScreenState extends State<SimulationScreen> {
                       color: AppColors.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    'Sim ID: ${sim.id.substring(0, 5)}',
+                    sim.id.length >= 5 ? '#${sim.id.substring(0, 5)}' : '#${sim.id}',
                     style: AppTextStyles.label.copyWith(
                       fontSize: 9,
                       color: Colors.grey.shade400,
@@ -545,29 +581,75 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   ),
                   const SizedBox(height: 8),
                   ...sim.stakeholderNotifications.entries
+                      .where((e) => e.value.isNotEmpty)
                       .map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                LucideIcons.send,
-                                size: 12,
-                                color: AppColors.accent,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${e.key.toUpperCase()}: ${e.value}',
-                                  style: AppTextStyles.body.copyWith(
-                                    fontSize: 11,
+                        (e) {
+                          // Choose icon per notification type
+                          IconData notifIcon;
+                          Color notifColor;
+                          switch (e.key.toLowerCase()) {
+                            case 'public':
+                              notifIcon = LucideIcons.megaphone;
+                              notifColor = AppColors.accent;
+                              break;
+                            case 'hospitals':
+                              notifIcon = LucideIcons.crosshair;
+                              notifColor = AppColors.dangerRed;
+                              break;
+                            case 'law_enforcement':
+                            case 'police':
+                              notifIcon = LucideIcons.shield;
+                              notifColor = const Color(0xFF3B82F6); // blue
+                              break;
+                            case 'utility_providers':
+                              notifIcon = LucideIcons.zap;
+                              notifColor = AppColors.severityMedium;
+                              break;
+                            default:
+                              notifIcon = LucideIcons.send;
+                              notifColor = AppColors.accent;
+                          }
+                          // Clean label: underscores → spaces, title case
+                          final label = e.key
+                              .replaceAll('_', ' ')
+                              .split(' ')
+                              .map((w) => w.isNotEmpty
+                                  ? '${w[0].toUpperCase()}${w.substring(1)}'
+                                  : w)
+                              .join(' ');
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(notifIcon, size: 14, color: notifColor),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: AppTextStyles.body.copyWith(fontSize: 12),
+                                      children: [
+                                        TextSpan(
+                                          text: '$label: ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: notifColor,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: e.value,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
+                              ],
+                            ),
+                          );
+                        },
                       )
                       .toList(),
                 ],
@@ -624,11 +706,18 @@ class _SimulationScreenState extends State<SimulationScreen> {
                   Wrap(
                     spacing: 12,
                     runSpacing: 8,
-                    children: improvement.entries.map<Widget>((e) {
+                    children: (improvement as Map).entries.map<Widget>((e) {
+                      // Clean up key: snake_case → Title Case
+                      final label = e.key.toString()
+                          .replaceAll('_', ' ')
+                          .split(' ')
+                          .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w)
+                          .join(' ');
+                      final value = fmtMetric(e.key.toString(), e.value);
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.successGreen.withOpacity(0.1),
@@ -642,12 +731,13 @@ class _SimulationScreenState extends State<SimulationScreen> {
                               size: 14,
                               color: AppColors.successGreen,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 6),
                             Text(
-                              '${e.key}: ${e.value}',
+                              '$label: $value',
                               style: AppTextStyles.label.copyWith(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],

@@ -273,31 +273,44 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
                     height: 52,
                     child: ElevatedButton(
                       onPressed: () async {
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => const Center(
-                            child: CircularProgressIndicator(color: AppColors.accent),
+                        // Fire-and-forget: backend returns instantly, pipeline runs in background
+                        // User can navigate freely while agents work
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              '⚡ Agents activated — pipeline running in background',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            duration: Duration(seconds: 4),
+                            backgroundColor: AppColors.textPrimary,
                           ),
                         );
-                        
                         try {
                           await _apiService.runScenario({});
+                          // Response arrives in ~1 second (202 Accepted)
                           if (mounted) {
-                            Navigator.of(context).pop(); 
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Intelligence Stress Test Started Successfully!'),
+                                content: Text(
+                                  '✅ Pipeline launched — check Agent Logs below',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                                 backgroundColor: AppColors.successGreen,
+                                duration: Duration(seconds: 4),
                               ),
                             );
                           }
                         } catch (e) {
                           if (mounted) {
-                            Navigator.of(context).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Error: $e'),
+                                content: Text(
+                                  'Error: $e',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                                 backgroundColor: AppColors.dangerRed,
                               ),
                             );

@@ -41,36 +41,61 @@ class ApiService {
     }
   }
 
-  // Helper to map Firestore doc to Incident model
-  Map<String, dynamic> _mapFirestoreToIncidentJson(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    final geo = data['location'] as GeoPoint;
-    final prediction = data['evolution_prediction'] as Map<String, dynamic>?;
+  // Helper to map Firestore doc to Incident model — fully defensive
+  Map<String, dynamic>? _mapFirestoreToIncidentJson(DocumentSnapshot doc) {
+    try {
+      final data = doc.data() as Map<String, dynamic>;
 
-    return {
-      'crisis_id': doc.id,
-      'type': data['type'] ?? 'unknown',
-      'severity': data['severity'] ?? 'LOW',
-      'confidence': (data['confidence_score'] ?? 0.0).toDouble(),
-      'status': data['status'] ?? 'active',
-      'affected_population': data['affected_population'] ?? 0,
-      'timestamp': data['timestamp'] is Timestamp 
-          ? (data['timestamp'] as Timestamp).toDate().toIso8601String()
-          : data['timestamp'] ?? DateTime.now().toIso8601String(),
-      'location': {
-        'name': data['location_name'] ?? 'Unknown Location',
-        'lat': geo.latitude,
-        'lng': geo.longitude,
-      },
-      // expected_duration_hours is stored at the root of the incident doc
-      // Use num? cast then toInt() — Firestore returns numbers as num (double)
-      'expected_duration_hours': (data['expected_duration_hours'] as num?)?.toInt(),
-      'peak_impact_time': prediction?['peak_impact_time'],
-      'title': data['title'] ?? '',
-      'signal_sources': data['signal_sources'] is List 
-          ? List<String>.from(data['signal_sources']) 
-          : [],
-    };
+      // Location: Firestore stores as GeoPoint — handle null or wrong type
+      double lat = 33.6844, lng = 73.0479; // fallback: Islamabad
+      final rawGeo = data['location'];
+      if (rawGeo is GeoPoint) {
+        lat = rawGeo.latitude;
+        lng = rawGeo.longitude;
+      }
+
+      final prediction = data['evolution_prediction'] is Map
+          ? data['evolution_prediction'] as Map<String, dynamic>
+          : null;
+
+      // peak_time key: detector writes 'peak_time' inside evolution_prediction
+      // but some LLM paths write 'peak_impact_time' — check both
+      final peakTime = prediction?['peak_impact_time']
+          ?? prediction?['peak_time']
+          ?? data['peak_impact_time'];
+
+      return {
+        'crisis_id': doc.id,
+        'type': data['type'] ?? 'unknown',
+        'severity': data['severity'] ?? 'LOW',
+        'confidence': (data['confidence_score'] as num?)?.toDouble() ?? 0.0,
+        'status': data['status'] ?? 'active',
+        'affected_population': (data['affected_population'] as num?)?.toInt() ?? 0,
+        'timestamp': data['timestamp'] is Timestamp
+            ? (data['timestamp'] as Timestamp).toDate().toIso8601String()
+            : data['timestamp']?.toString() ?? DateTime.now().toIso8601String(),
+        'location': {
+          'name': data['location_name'] ?? 'Unknown Location',
+          'lat': lat,
+          'lng': lng,
+        },
+        // expected_duration_hours is at root (set by DetectorAgent)
+        'expected_duration_hours': (data['expected_duration_hours'] as num?)?.toInt()
+            ?? (prediction?['duration_hours'] as num?)?.toInt(),
+        'peak_impact_time': peakTime,
+        'title': data['title'] ?? '',
+        'signal_sources': data['signal_sources'] is List
+            ? (data['signal_sources'] as List)
+                .whereType<String>()
+                .toList()
+            : [],
+        // media_url: guard against non-String values from Firestore
+        'media_url': data['media_url'] is String ? data['media_url'] as String : null,
+      };
+    } catch (e) {
+      debugPrint('Error mapping incident ${doc.id}: $e');
+      return null;
+    }
   }
 
   // REAL-TIME INCIDENTS STREAM (Active Only)
@@ -80,17 +105,29 @@ class ApiService {
         .where('status', isEqualTo: 'active')
         .snapshots()
         .map((snapshot) {
-      final list = snapshot.docs.map((doc) {
-        return Incident.fromJson(_mapFirestoreToIncidentJson(doc));
-      }).toList();
-      
-      // Sort in memory: Latest first
+      final list = snapshot.docs
+          .map((doc) => _mapFirestoreToIncidentJson(doc))
+          .whereType<Map<String, dynamic>>()
+          .map((json) {
+            try {
+              return Incident.fromJson(json);
+            } catch (e) {
+              debugPrint('Incident.fromJson error: $e | json: $json');
+              return null;
+            }
+          })
+          .whereType<Incident>()
+          .toList();
+
       list.sort((a, b) {
         if (a.timestamp == null) return 1;
         if (b.timestamp == null) return -1;
         return b.timestamp!.compareTo(a.timestamp!);
       });
       return list;
+    }).handleError((e) {
+      debugPrint('getIncidentsStream error: $e');
+      return <Incident>[];
     });
   }
 
@@ -102,9 +139,11 @@ class ApiService {
         .limit(20)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return Incident.fromJson(_mapFirestoreToIncidentJson(doc));
-      }).toList();
+      return snapshot.docs
+          .map((doc) => _mapFirestoreToIncidentJson(doc))
+          .whereType<Map<String, dynamic>>()
+          .map((json) => Incident.fromJson(json))
+          .toList();
     });
   }
 
@@ -116,7 +155,9 @@ class ApiService {
         .snapshots()
         .map((doc) {
       if (!doc.exists) return null;
-      return Incident.fromJson(_mapFirestoreToIncidentJson(doc));
+      final json = _mapFirestoreToIncidentJson(doc);
+      if (json == null) return null;
+      return Incident.fromJson(json);
     });
   }
 
@@ -170,18 +211,63 @@ class ApiService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        if (data['timestamp'] is Timestamp) {
-          data['timestamp'] = (data['timestamp'] as Timestamp).toDate().toIso8601String();
-        }
-        if (data['stakeholder_notifications'] != null) {
-          data['stakeholder_notifications'] = Map<String, String>.from(
-            (data['stakeholder_notifications'] as Map).map((k, v) => MapEntry(k.toString(), v.toString()))
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+
+          // Fix timestamp
+          if (data['timestamp'] is Timestamp) {
+            data['timestamp'] = (data['timestamp'] as Timestamp).toDate().toIso8601String();
+          } else {
+            data['timestamp'] ??= DateTime.now().toIso8601String();
+          }
+
+          // Firestore uses 'impact' but model expects 'impact_prediction'
+          // Also flatten any nested maps/lists to strings defensively
+          final rawImpact = data['impact'] ?? data['impact_prediction'] ?? {};
+          String safeStr(dynamic v) {
+            if (v == null) return '';
+            if (v is String) return v;
+            if (v is List) return v.join(', ');
+            if (v is Map) return v.values.map((e) => e is List ? e.join(', ') : e.toString()).join(' | ');
+            return v.toString();
+          }
+          final impactMap = rawImpact is Map ? rawImpact : {};
+          final improvement = impactMap['improvement_metrics'];
+          data['impact_prediction'] = {
+            'before_state': safeStr(impactMap['before_state']),
+            'after_state': safeStr(impactMap['after_state']),
+            'improvement_metrics': improvement is Map
+                ? Map<String, String>.fromEntries(
+                    improvement.entries.map((e) => MapEntry(e.key.toString(), safeStr(e.value))),
+                  )
+                : <String, String>{},
+          };
+
+          // Firestore uses 'notifications' but model expects 'stakeholder_notifications'
+          final rawNotif = data['notifications'] ?? data['stakeholder_notifications'];
+          if (rawNotif is Map) {
+            data['stakeholder_notifications'] = Map<String, String>.fromEntries(
+              rawNotif.entries.map((e) => MapEntry(e.key.toString(), safeStr(e.value))),
+            );
+          } else {
+            data['stakeholder_notifications'] = <String, String>{};
+          }
+
+          return ActionSimulation.fromJson(data);
+        } catch (e) {
+          debugPrint('Error parsing simulation ${doc.id}: $e');
+          return ActionSimulation(
+            id: doc.id,
+            incidentId: '',
+            actionType: 'Unknown',
+            description: 'Data parse error',
+            impactPrediction: const {},
+            stakeholderNotifications: const {},
+            timestamp: DateTime.now(),
           );
         }
-        return ActionSimulation.fromJson(data);
-      }).toList();
+      }).where((s) => s.incidentId.isNotEmpty).toList();
     });
   }
 

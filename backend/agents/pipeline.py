@@ -165,12 +165,14 @@ async def run_crisis_simulation(scenario_data: dict = None):
                             "signal_id": sig_id,
                             "status": status,
                             "credibility": credibility,
-                            "incident_id": None,
+                            # If signal was already linked to an incident (e.g. from /api/report)
+                            # pass that ID so process_signal_evaluations updates it, not creates new
+                            "incident_id": meta.get("incident_id"),
                             "new_incident_data": {
                                 "type": _infer_type(sig),
                                 "severity": _infer_severity(credibility),
                                 "location_name": loc_name,
-                            } if status == "verified" else None,
+                            } if status == "verified" and not meta.get("incident_id") else None,
                         })
 
                     tracer.log("SignalFusionAgent",
@@ -455,6 +457,15 @@ async def run_crisis_simulation(scenario_data: dict = None):
                 "protest":      "⚠️ TRAFFIC: Dharna jari hai. Mutabadil rasta istemal karein.",
                 "emergency":    "⚠️ EMERGENCY: Emergency services ki hidayat par amal karein.",
             }
+            _LAW = {
+                "flood":        "Police assisting evacuation. Traffic diversion active on flooded routes.",
+                "heatwave":     "Police setting up shaded rest stops. Monitoring vulnerable residents.",
+                "fire":         "Police cordon active. Crowd control and area evacuation in progress.",
+                "accident":     "Police on scene. Road closed for investigation and clearance.",
+                "power_outage": "Police monitoring blackout zones for security and looting prevention.",
+                "protest":      "Police deployed for crowd management and traffic rerouting.",
+                "emergency":    "Police units dispatched. Coordinating with emergency services on site.",
+            }
             fallback_sims = []
             for inc in sim_ready:
                 t = inc.get("type", "emergency")
@@ -462,6 +473,7 @@ async def run_crisis_simulation(scenario_data: dict = None):
                 sev = inc.get("severity", "MEDIUM")
                 fallback_sims.append({
                     "incident_id":  inc["id"],
+                    "type":         t,
                     "action_type":  f"{t.replace('_',' ').title()} Response",
                     "description":  f"Coordinated {sev} {t} response at {loc}.",
                     "impact": {
@@ -470,9 +482,10 @@ async def run_crisis_simulation(scenario_data: dict = None):
                         "improvement_metrics": {"response_time_reduction": "18 min", "safety_boost": "45%"},
                     },
                     "notifications": {
-                        "public":            _PUBLIC.get(t, _PUBLIC["emergency"]),
-                        "hospitals":         f"ALERT: {t.title()} casualties expected from {loc}.",
+                        "public":           _PUBLIC.get(t, _PUBLIC["emergency"]),
+                        "hospitals":        f"ALERT: {t.title()} casualties expected from {loc}. Prepare emergency ward.",
                         "utility_providers": f"{'Power disruption possible' if t in ('flood','fire') else 'No utility impact'} at {loc}.",
+                        "law_enforcement":  _LAW.get(t, _LAW["emergency"]),
                     },
                 })
 
@@ -489,7 +502,7 @@ async def run_crisis_simulation(scenario_data: dict = None):
                     "Output ONLY a valid JSON array — no markdown. "
                     "Each item: incident_id, action_type, description, "
                     "impact:{before_state, after_state, improvement_metrics:{response_time_reduction, safety_boost}}, "
-                    "notifications:{public (Urdu/Roman Urdu), hospitals, utility_providers}."
+                    "notifications:{public (Urdu/Roman Urdu), hospitals, utility_providers, law_enforcement}."
                 )
                 usr4 = f"Generate simulations:\n{json.dumps(slim4, ensure_ascii=False)}"
                 base4 = _AGENT_SLOT.get("SimulationStakeholderAgent", 3)

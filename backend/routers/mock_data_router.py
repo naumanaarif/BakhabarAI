@@ -111,6 +111,16 @@ async def submit_report(report: dict):
     )
     print(f"DEBUG: Created preliminary incident {preliminary_incident_id} for immediate dashboard display.")
 
+    # Write media_url directly to the incident if provided — don't wait for pipeline propagation
+    report_media_url = report.get("media_url") or metadata.get("media_url")
+    if report_media_url and preliminary_incident_id:
+        try:
+            from firebase_config import db
+            db.collection("incidents").document(preliminary_incident_id).update({"media_url": report_media_url})
+            print(f"DEBUG: Attached media_url to incident {preliminary_incident_id}")
+        except Exception as e:
+            print(f"WARN: Could not attach media_url: {e}")
+
     # 2. Save signal in Firestore and associate with the new incident
     signal_id = FirebaseService.add_signal(
         source_type="social",
@@ -193,34 +203,25 @@ async def run_scenario(scenario: dict = None):
     active = query_active_incidents()
     print(f"[SCENARIO] Active incidents after seeding: {len(active)}")
 
-    try:
-        result = await run_crisis_simulation(scenario_data=scenario)
-        final_active = query_active_incidents()
-        return {
-            "status": "success",
-            "result": result,
-            "incidents_seeded": len(seeded_ids),
-            "incidents_active": len(final_active),
-            "traces": tracer.get_traces(),
-        }
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        stack_trace = traceback.format_exc()
-        print(f"[SCENARIO] Pipeline error: {error_msg}")
-        print(stack_trace)
-        tracer.log(
-            agent_name="System",
-            action="simulation_error",
-            input_data={"scenario": str(scenario)[:200]},
-            output_data={"error": error_msg},
-            confidence=0.0,
-        )
-        return {
-            "status": "error",
-            "message": error_msg,
-            "traceback": stack_trace,
-        }
+    # ── Launch pipeline in background (non-blocking) ──
+    # Return 202 immediately so the app doesn't freeze.
+    # The pipeline runs async; results appear live in Firestore / agent logs.
+    import asyncio
+
+    async def _run_pipeline_bg():
+        try:
+            await run_crisis_simulation(scenario_data=scenario)
+        except Exception as bg_err:
+            print(f"[SCENARIO] Background pipeline error: {bg_err}")
+
+    asyncio.create_task(_run_pipeline_bg())
+
+    return {
+        "status": "started",
+        "message": f"Stress test pipeline launched in background. {len(seeded_ids)} incidents seeded.",
+        "incidents_seeded": len(seeded_ids),
+        "incidents_seeded_ids": seeded_ids,
+    }
 
 @router.get("/logs")
 async def get_logs():
@@ -247,6 +248,32 @@ async def clear_logs():
     """Clears in-memory tracer logs. Use before a fresh scenario run."""
     tracer.clear()
     return {"status": "cleared"}
+
+@router.get("/debug/incidents")
+async def debug_incidents():
+    """Returns ALL incidents from Firestore (any status) for debugging.
+    Use to check if incidents exist but aren't showing on frontend."""
+    from firebase_config import db
+    from google.cloud.firestore_v1 import GeoPoint
+    docs = list(db.collection("incidents").stream())
+    result = []
+    for doc in docs:
+        d = doc.to_dict()
+        loc = d.get("location")
+        result.append({
+            "id": doc.id,
+            "type": d.get("type"),
+            "status": d.get("status"),
+            "severity": d.get("severity"),
+            "location_name": d.get("location_name"),
+            "lat": loc.latitude if isinstance(loc, GeoPoint) else None,
+            "lng": loc.longitude if isinstance(loc, GeoPoint) else None,
+            "confidence_score": d.get("confidence_score"),
+            "expected_duration_hours": d.get("expected_duration_hours"),
+            "media_url": d.get("media_url"),
+            "has_location": isinstance(loc, GeoPoint),
+        })
+    return {"total": len(result), "incidents": result}
 
 @router.get("/places/autocomplete")
 async def places_autocomplete(q: str):
