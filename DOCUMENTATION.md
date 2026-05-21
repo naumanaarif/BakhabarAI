@@ -64,49 +64,96 @@ Every LLM-dependent stage has a hardcoded deterministic fallback. If the Groq or
 
 ## 3. System Architecture
 
+```mermaid
+graph TD
+  %% Style Definitions
+  classDef default fill:#ffffff,stroke:#6b6b6b,stroke-width:1px,color:#1a1a1a;
+  classDef highlight fill:#ff6036,stroke:#ff6036,stroke-width:2px,color:#ffffff;
+  classDef softBg fill:#f4f1e9,stroke:#6b6b6b,stroke-width:1px,color:#1a1a1a;
+  classDef dbStyle fill:#ffffff,stroke:#ef4444,stroke-width:1.5px,color:#1a1a1a;
+  classDef apiStyle fill:#ffffff,stroke:#f59e0b,stroke-width:1.5px,color:#1a1a1a;
+
+  subgraph Mobile["📱 Flutter Mobile App (Android APK)"]
+    direction TB
+    Nav["4-Tab Navigation & Map UI<br/>(Glassmorphic Overlays)"]
+    DioClient["Dio HTTP Client"]
+    FS_SDK["Firebase Firestore SDK"]
+  end
+
+  subgraph Backend["⚙️ FastAPI Backend (Python 3.11+)"]
+    direction TB
+    APIServer["FastAPI Server<br/>(Uvicorn)"]
+    Tracer["AgentTracer Log Collector"]
+    subgraph Routes["REST Endpoints"]
+      API_Incidents["/api/incidents"]
+      API_Scenario["/api/run-scenario"]
+      API_Report["/api/report"]
+      API_Logs["/api/logs"]
+      API_Places["/api/places/autocomplete"]
+    end
+  end
+
+  subgraph ADK["🤖 Google ADK Agent Pipeline"]
+    direction TB
+    ADK_Orch["Google ADK Orchestration<br/>(SequentialAgent)"]
+    S1["Stage 1: SignalFusionAgent<br/>(Normalizes Signal Feed)"]
+    S2["Stage 2: DetectorAgent<br/>(Classifies Severity & Type)"]
+    S3["Stage 3: ResourcePlannerAgent<br/>(Resource Trade-off & Rules)"]
+    S4["Stage 4: SimulationAgent<br/>(Simulates Actions & Routes)"]
+    S5["Stage 5: ReporterAgent<br/>(Generates Outcomes & Stakeholder Alerts)"]
+
+    ADK_Orch --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+
+  subgraph DB["🔥 Firebase Firestore"]
+    direction TB
+    C_Signals[("signals")]
+    C_Incidents[("incidents")]
+    C_Resources[("resources")]
+    C_Simulations[("action_simulations")]
+    C_Logs[("agent_logs")]
+  end
+
+  subgraph Ext["🗺️ Google Maps Platform APIs"]
+    direction TB
+    API_Geo["Geocoding API"]
+    API_Dist["Distance Matrix API"]
+    API_Dir["Directions API"]
+    API_PlNew["Places API (New)"]
+    API_Weather["Weather API"]
+  end
+
+  subgraph LLM["🧠 Large Language Models"]
+    direction TB
+    Gemini["Gemini 2.0 Flash (Primary via ADK)"]
+    Groq["Groq Llama-3.1-8b (Secondary Fallback)"]
+  end
+
+  %% Flow and Connections
+  DioClient <-->|HTTP / REST| APIServer
+  FS_SDK <.->|Real-time Streams| DB
+  APIServer -->|Triggers Pipeline Async| ADK_Orch
+  APIServer <-->|CRUD Operations| DB
+  ADK -->|Writes Outcomes / Logs| DB
+  ADK -->|Tool Calls| Ext
+  ADK <-->|Reasoning & Alert Drafts| LLM
+  Tracer -->|Persists Agent Steps| DB
+
+  %% Apply Classes
+  class Mobile softBg;
+  class ADK softBg;
+  class APIServer highlight;
+  class ADK_Orch highlight;
+  class Nav highlight;
+  class C_Signals,C_Incidents,C_Resources,C_Simulations,C_Logs dbStyle;
+  class API_Geo,API_Dist,API_Dir,API_PlNew,API_Weather apiStyle;
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     BakhabarAI System                               │
-│                                                                     │
-│  ┌──────────────────────┐          ┌─────────────────────────────┐ │
-│  │  Flutter Mobile App  │◄────────►│     FastAPI Backend         │ │
-│  │  (Android APK)       │  HTTP/   │     (Python 3.11+)          │ │
-│  │                      │  REST    │                             │ │
-│  │  • 4-tab navigation  │          │  • /api/incidents           │ │
-│  │  • Real-time streams │          │  • /api/run-scenario        │ │
-│  │  • Google Maps SDK   │          │  • /api/logs                │ │
-│  │  • Glassmorphic UI   │          │  • /api/report              │ │
-│  │  • Dio HTTP client   │          │  • /api/places/autocomplete │ │
-│  └──────────┬───────────┘          └──────────────┬──────────────┘ │
-│             │                                     │                │
-│             │ Real-time                           │ Triggers       │
-│             │ Firestore                           │                │
-│             ▼ streams                             ▼                │
-│  ┌──────────────────────┐     ┌─────────────────────────────────┐ │
-│  │  Firebase Firestore  │◄────│   Google ADK Agent Pipeline     │ │
-│  │                      │     │                                 │ │
-│  │  Collections:        │     │  Stage 1: SignalFusionAgent     │ │
-│  │  • incidents         │     │  Stage 2: DetectorAgent         │ │
-│  │  • signals           │     │  Stage 3: ResourcePlannerAgent  │ │
-│  │  • resources         │     │  Stage 4: SimulationAgent       │ │
-│  │  • agent_logs        │     │  Stage 5: ReporterAgent         │ │
-│  │  • action_sims       │     │                                 │ │
-│  └──────────────────────┘     │  LLM: Gemini 2.0 Flash          │ │
-│                               │  LLM: Groq (llama-3.1-8b)       │ │
-│                               └────────────┬────────────────────┘ │
-│                                            │                       │
-│                                            ▼                       │
-│                          ┌─────────────────────────────┐          │
-│                          │   Google Maps Platform APIs  │          │
-│                          │                             │          │
-│                          │  • Geocoding API             │          │
-│                          │  • Distance Matrix API       │          │
-│                          │  • Directions API            │          │
-│                          │  • Places API (New)          │          │
-│                          │  • Weather API               │          │
-│                          └─────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+
 
 ### Component Responsibilities
 
