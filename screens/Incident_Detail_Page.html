@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Incident Detail Page - BakhabarAI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#313030",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e5e2da",
+                        "tertiary": "#5d5f5f",
+                        "inverse-on-surface": "#f3f0ef",
+                        "outline-variant": "#c9c7bd",
+                        "surface-tint": "#5f5e58",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#f0eded",
+                        "on-surface": "#1c1b1b",
+                        "on-background": "#1c1b1b",
+                        "outline": "#78776f",
+                        "on-primary-fixed-variant": "#474741",
+                        "secondary-fixed-dim": "#ffb4a1",
+                        "on-secondary-fixed": "#3c0800",
+                        "secondary": "#b32a00",
+                        "secondary-container": "#fd5f35",
+                        "tertiary-container": "#f1f1f1",
+                        "primary-fixed-dim": "#c9c6bf",
+                        "inverse-primary": "#c9c6bf",
+                        "surface-container-low": "#f6f3f2",
+                        "on-secondary-container": "#591000",
+                        "secondary-fixed": "#ffdbd2",
+                        "surface-dim": "#dcd9d9",
+                        "primary-container": "#f4f1e9",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "primary": "#5f5e58",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#1c1c17",
+                        "background": "#fcf9f8",
+                        "surface-container-highest": "#e5e2e1",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#eae7e7",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-tertiary-container": "#6c6e6e",
+                        "on-secondary-fixed-variant": "#891e00",
+                        "on-primary-container": "#6f6d67",
+                        "on-surface-variant": "#474740",
+                        "surface-bright": "#fcf9f8",
+                        "surface-variant": "#e5e2e1",
+                        "surface": "#fcf9f8",
+                        "error": "#ba1a1a",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "base": "4px",
+                        "sm": "12px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "xxl": "48px",
+                        "md": "16px",
+                        "gutter": "16px",
+                        "container-margin": "20px",
+                        "xs": "8px"
+                    },
+                    fontFamily: {
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "headline-xl": ["Plus Jakarta Sans"],
+                        "label-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Plus Jakarta Sans"]
+                    },
+                    fontSize: {
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .soft-shadow {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-[120px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center px-container-margin h-[64px] bg-surface/85 backdrop-blur-md border-b border-outline-variant/30">
+<button aria-label="Go back" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-variant transition-colors mr-3">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">BakhabarAI</h1>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[88px] px-container-margin max-w-[1280px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-lg">
+<!-- Center Column (Mobile: col-1, Desktop: col-span-8) -->
+<div class="col-span-1 md:col-span-8 space-y-lg">
+<!-- Page Title Area -->
+<div class="mb-lg">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface">Incident A</h2>
+<div class="flex items-center gap-2 mt-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>Industrial Sector 4, Karachi</span>
+</div>
+</div>
+<!-- Media Placeholder Card -->
+<div class="relative w-full aspect-video rounded-xl overflow-hidden soft-shadow bg-surface-container-high group cursor-pointer">
+<img alt="Crisis surveillance media" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="A high-resolution aerial surveillance footage snapshot of an industrial sector during an urban crisis. The scene is rendered in a modern light-mode aesthetic, featuring predominantly muted concrete greys and bright white highlights, sharply contrasted by a glowing amber and vibrant coral thermal hotspot at the center. The lighting suggests mid-day with soft, diffused shadows, conveying a tense yet technologically managed atmosphere. The image is clean, highly detailed, and suitable for a professional AI dashboard interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRwVlyK9PIjECrBxzOzG774__9ciYxrr6bvTcEuq7qgZATxYjHcVzGGS9QSbOQ3zZfVMWIOBjy9_x_UT5I2aYVlFecVTVQ29rrgEZANkRA4oh8BwBppiFRHWbPxMWrE5q_bPdjHqew4Mo5xI7Gzg8Xfog_QB3dtR8A3I3FXuSpYBajAHNRmX2pBT3Ui2rPiqCR1BlnJ311SMJIfgnImnpyQ0Fd05KouLjRi1fXfaTfZ5hvlCgoDwYrkz3gtYajmBssCYk5-jD6_Dc"/>
+<!-- Play Button Overlay -->
+<div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+<div class="w-[64px] h-[64px] rounded-full glass-panel flex items-center justify-center soft-shadow">
+<span class="material-symbols-outlined text-[32px] text-on-surface" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<!-- Live Badge -->
+<div class="absolute top-sm left-sm bg-error/90 text-on-error px-3 py-1 rounded-[8px] font-label-sm text-label-sm flex items-center gap-1 backdrop-blur-md">
+<span class="w-2 h-2 rounded-full bg-on-error animate-pulse"></span>
+                    LIVE FEED
+                </div>
+</div>
+<!-- Crisis Info & Signal Sources Bento -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
+<!-- Severity & Confidence Card -->
+<div class="bg-surface rounded-xl p-md soft-shadow flex flex-col justify-between">
+<div class="flex items-start justify-between mb-lg">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-error">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Chemical Fire</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Primary Classification</p>
+</div>
+</div>
+<div class="bg-error-container text-error px-2 py-1 rounded-[8px] font-label-sm text-label-sm uppercase tracking-wider">
+                            Critical
+                        </div>
+</div>
+<div>
+<div class="flex justify-between items-end mb-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">AI Confidence Rating</span>
+<span class="font-label-md text-label-md text-on-surface">94%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-secondary-container rounded-full" style="width: 94%;"></div>
+</div>
+</div>
+</div>
+<!-- Signal Sources Card -->
+<div class="bg-surface rounded-xl p-md soft-shadow">
+<h3 class="font-label-md text-label-md text-on-surface mb-sm">Signal Sources</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-md">Data aggregation from ground sensors and public reports.</p>
+<div class="flex flex-wrap gap-2">
+<div class="flex items-center gap-1 bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-primary">sensors</span>
+<span class="font-label-sm text-label-sm text-on-surface">Thermal Node 4</span>
+<span class="material-symbols-outlined text-[14px] text-secondary ml-1" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-primary">satellite_alt</span>
+<span class="font-label-sm text-label-sm text-on-surface">Sat-Link Beta</span>
+<span class="material-symbols-outlined text-[14px] text-secondary ml-1" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-primary">public</span>
+<span class="font-label-sm text-label-sm text-on-surface">Social Feeds</span>
+<span class="material-symbols-outlined text-[14px] text-[#b07b00] ml-1" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Info Rows -->
+<div class="bg-surface rounded-xl soft-shadow divide-y divide-outline-variant/30">
+<div class="flex items-center justify-between p-md">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">group</span>
+<span class="font-body-md text-body-md text-on-surface">Affected Population</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">Est. 12,500</span>
+</div>
+<div class="flex items-center justify-between p-md">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">schedule</span>
+<span class="font-body-md text-body-md text-on-surface">Expected Duration</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">4 - 6 Hours</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Bar (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full glass-panel border-t border-outline-variant/20 p-container-margin z-40">
+<div class="max-w-[1280px] mx-auto flex flex-col sm:flex-row gap-sm justify-end">
+<button class="h-[52px] px-lg rounded-xl border border-on-surface bg-surface text-on-surface font-label-md text-label-md flex-1 sm:flex-none flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">science</span>
+                Show Simulation
+            </button>
+<button class="h-[52px] px-lg rounded-xl bg-secondary-container text-on-primary font-label-md text-label-md flex-1 sm:flex-none flex items-center justify-center gap-2 hover:opacity-90 transition-opacity soft-shadow">
+<span class="material-symbols-outlined text-[20px]">local_shipping</span>
+                Resource Allocation
+            </button>
+</div>
+</div>
+</body></html>

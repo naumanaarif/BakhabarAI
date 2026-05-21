@@ -1,0 +1,12 @@
+[
+  {
+    "signal_id": "fr_001",
+    "source_type": "field_report",
+    "source_name": "Rescue 1122 Field Unit",
+    "timestamp": "2024-01-15T15:00:00Z",
+    "location": { "name": "G-10 Service Road", "lat": 33.6850, "lng": 73.0480 },
+    "content": "Confirmed: Water level rising. Road partially submerged. Deploying barriers.",
+    "credibility_score": 0.95,
+    "is_mock": true
+  }
+]

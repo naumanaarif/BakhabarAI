@@ -1,0 +1,17 @@
+{
+  "scenario_id": "false_001",
+  "name": "False Alarm Recovery",
+  "description": "Initial flood report later contradicted by field units.",
+  "initial_signals": [
+    {
+      "signal_id": "social_false_001",
+      "source_type": "social",
+      "source_name": "Twitter",
+      "timestamp": "2024-01-15T12:00:00Z",
+      "location": { "name": "F-7, Islamabad", "lat": 33.7297, "lng": 73.0548 },
+      "content": "Big explosion heard in F-7!!",
+      "credibility_score": 0.4,
+      "is_mock": true
+    }
+  ]
+}

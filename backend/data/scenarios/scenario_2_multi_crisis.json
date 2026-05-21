@@ -1,0 +1,17 @@
+{
+  "scenario_id": "multi_001",
+  "name": "Simultaneous Flood and Heatwave",
+  "description": "Flash flood in G-10 while I-8 suffers from an extreme heatwave.",
+  "initial_signals": [
+    {
+      "signal_id": "weather_heat_001",
+      "source_type": "weather",
+      "source_name": "Google Weather API",
+      "timestamp": "2024-01-15T10:00:00Z",
+      "location": { "name": "I-8, Islamabad", "lat": 33.6682, "lng": 73.0768 },
+      "content": "Temperature rising to 45C. Heatwave warning issued.",
+      "credibility_score": 1.0,
+      "is_mock": false
+    }
+  ]
+}
