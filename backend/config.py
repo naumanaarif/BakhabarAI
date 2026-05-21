@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+# load_dotenv is a no-op if .env doesn't exist (Cloud Run / production).
+# In production, secrets are injected as env vars via Secret Manager.
 load_dotenv(override=True)
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("Google_MAPS_API_KEY") or ""

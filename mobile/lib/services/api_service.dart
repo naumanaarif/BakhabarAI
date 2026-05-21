@@ -10,10 +10,24 @@ import '../models/simulation.dart';
 class ApiService {
   late final Dio _dio;
   late final FirebaseFirestore _firestore;
-  
-  /// Base URL for the FastAPI backend.
-  /// Note: Use 10.0.2.2 for Android Emulator, localhost for iOS, or your machine's IP for physical devices.
-  static const String baseUrl = 'http://192.168.0.241:8000/api'; 
+
+  // ── Backend URL configuration ────────────────────────────────────────────
+  // PRODUCTION:  Cloud Run (default — works for APK on any network)
+  static const String _cloudRunUrl =
+      'https://bakhabarai-backend-654186953716.us-central1.run.app/api';
+
+  // LOCAL DEV:   Your machine's IP on local WiFi (emulator uses 10.0.2.2)
+  // Change this to your current LAN IP when testing locally
+  static const String _localUrl = 'http://192.168.0.241:8000/api';
+
+  // Toggle: set to true to hit local backend, false for Cloud Run.
+  // Or pass --dart-define=USE_LOCAL=true when running flutter.
+  static const bool _useLocal =
+      bool.fromEnvironment('USE_LOCAL', defaultValue: false);
+
+  static const String baseUrl = _useLocal ? _localUrl : _cloudRunUrl;
+  // ─────────────────────────────────────────────────────────────────────────
+
 
   ApiService() {
     _firestore = FirebaseFirestore.instanceFor(
