@@ -1,6 +1,5 @@
-# BakhabarAI — Technical Documentation
+# BakhabarAI
 
-> **Shehar ka Nigehban** — Guardian of the City  
 > CIRO Challenge: Crisis Intelligence & Response Orchestrator
 
 ---
@@ -951,4 +950,16 @@ bakhabarai/
 
 ---
 
-*BakhabarAI — Built for the CIRO Challenge using Google Antigravity (ADK), Gemini 2.0 Flash, Firebase, and Flutter.*
+## Team
+
+**Team Solvit** — Google AI Seekho Antigravity Hackathon 2026
+
+| Name | GitHub |
+|---|---|
+| Nauman Arif | [@naumanaarif](https://github.com/naumanaarif) |
+| Hamza Ali | [@Hamza-asm](https://github.com/Hamza-asm) |
+| Ismail Dad Khan | [@IsmailDadKhan](https://github.com/IsmailDadKhan) |
+
+---
+
+> *BakhabarAI — Built for the CIRO Challenge using Google Antigravity (ADK), Gemini 2.0 Flash, Firebase, and Flutter.*
