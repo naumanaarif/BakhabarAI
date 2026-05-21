@@ -1,8 +1,8 @@
 fastapi
 uvicorn[standard]
 google-adk[extensions]
-google-generativeai==0.8.6
-google-cloud-aiplatform==1.148.1
+google-generativeai
+google-cloud-aiplatform
 litellm
 groq
 googlemaps
@@ -15,7 +15,6 @@ pydantic-settings
 pandas
 python-dateutil
 orjson
-starlette
 anyio
 structlog
 typing-extensions
