@@ -81,31 +81,53 @@ async def process_signal_evaluations(payload: Dict[str, Any] = None, **kwargs) -
         print(f"!!! [LOOP_BREAKER] Committing Signal Evaluation: {signal_id} -> {status} !!!")
         
         if status == 'verified':
-            if incident_id and incident_id != "null" and incident_id != "None":
+            # --- Read signal location + metadata from Firestore ---
+            _sig_lat, _sig_lng = 33.6844, 73.0479  # fallback: Islamabad
+            _sig_meta = {}
+            try:
+                _sig_doc = db.collection("signals").document(signal_id).get()
+                if _sig_doc.exists:
+                    _geo = _sig_doc.to_dict().get("location")
+                    if hasattr(_geo, 'latitude'):
+                        _sig_lat, _sig_lng = _geo.latitude, _geo.longitude
+                    _sig_meta = _sig_doc.to_dict().get("metadata") or {}
+            except Exception as _e:
+                print(f"DEBUG: Could not read signal location for {signal_id}: {_e}")
+
+            if incident_id and incident_id not in ("null", "None", ""):
+                # PATH A: Signal is linked to an existing incident → boost confidence
                 inc_ref = db.collection("incidents").document(incident_id)
                 inc_doc = inc_ref.get()
                 if inc_doc.exists:
                     current_conf = float(inc_doc.to_dict().get("confidence_score", 0.3))
                     new_conf = round(min(0.99, current_conf + (1.0 - current_conf) * 0.4), 2)
                     inc_ref.update({"confidence_score": new_conf, "last_updated": firestore.SERVER_TIMESTAMP})
-                # Read the signal's actual lat/lng from Firestore instead of hardcoding Islamabad
-                _sig_lat, _sig_lng = 33.6844, 73.0479  # fallback
-                try:
-                    _sig_doc = db.collection("signals").document(signal_id).get()
-                    if _sig_doc.exists:
-                        _geo = _sig_doc.to_dict().get("location")
-                        if hasattr(_geo, 'latitude'):
-                            _sig_lat, _sig_lng = _geo.latitude, _geo.longitude
-                        # Also try to get location_name from metadata if not in new_data
-                        _meta = _sig_doc.to_dict().get("metadata", {})
-                        if _meta.get("location_name") and inc_loc in ('Unknown', ''):
-                            inc_loc = _meta["location_name"]
-                except Exception as _e:
-                    print(f"DEBUG: Could not read signal location for {signal_id}: {_e}")
-                incident_id = create_incident(incident_type=inc_type, severity=inc_sev, confidence=credibility, location_name=inc_loc, lat=_sig_lat, lng=_sig_lng, signal_source="Citizen Report")
+                    print(f"DEBUG: Boosted confidence of incident {incident_id} to {new_conf}")
+
+            elif new_data and isinstance(new_data, dict):
+                # PATH B: New signal with type/severity/location → create incident
+                inc_type = str(new_data.get('type') or 'emergency').lower()
+                inc_sev  = str(new_data.get('severity') or 'MEDIUM').upper()
+                inc_loc  = (
+                    str(new_data.get('location_name') or '')
+                    or _sig_meta.get('location_name')
+                    or 'Islamabad'
+                )
+                incident_id = create_incident(
+                    incident_type=inc_type,
+                    severity=inc_sev,
+                    confidence=credibility,
+                    location_name=inc_loc,
+                    lat=_sig_lat,
+                    lng=_sig_lng,
+                    signal_source=_sig_meta.get('source_type', 'Signal Feed'),
+                )
+                print(f"DEBUG: Created incident {incident_id} ({inc_type}/{inc_sev}) at {inc_loc}")
+
             else:
+                # PATH C: Verified but no actionable data → log and mark noise
                 print(f"DEBUG: Signal {signal_id} verified but no incident mapping or data provided. Skipping incident creation.")
-                status = 'noise' # Revert to noise if we can't do anything with it
+                status = 'noise'
         
         verify_signal(signal_id, credibility, status, incident_id)
         _ALREADY_PROCESSED_SIGNALS.add(signal_id)
