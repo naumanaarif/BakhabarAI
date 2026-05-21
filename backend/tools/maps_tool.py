@@ -127,7 +127,11 @@ async def get_places_autocomplete(query: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"DEBUG: Classic Places API Exception: {e}")
                     
-    return {"predictions": [{"description": f"{query} (Manual Entry)"}]}
+    return {"predictions": [
+        {"description": f"{query}, Islamabad"},
+        {"description": f"{query}, Rawalpindi"},
+        {"description": f"{query} Sector, Islamabad"}
+    ]}
 
 async def geocode(address: str) -> Dict[str, Any]:
     """

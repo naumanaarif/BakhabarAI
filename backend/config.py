@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # In production, secrets are injected as env vars via Secret Manager.
 load_dotenv(override=True)
 
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("Google_MAPS_API_KEY") or ""
+GOOGLE_MAPS_API_KEY = (os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("Google_MAPS_API_KEY") or "").strip().replace("\ufeff", "")
 # If multiple keys are provided in a comma-separated list, take the first one
 if "," in GOOGLE_MAPS_API_KEY:
     GOOGLE_MAPS_API_KEY = GOOGLE_MAPS_API_KEY.split(",")[0].strip()

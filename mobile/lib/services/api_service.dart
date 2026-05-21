@@ -23,7 +23,7 @@ class ApiService {
   // Toggle: set to true to hit local backend, false for Cloud Run.
   // Or pass --dart-define=USE_LOCAL=true when running flutter.
   static const bool _useLocal =
-      bool.fromEnvironment('USE_LOCAL', defaultValue: false);
+      bool.fromEnvironment('USE_LOCAL', defaultValue: true);
 
   static const String baseUrl = _useLocal ? _localUrl : _cloudRunUrl;
   // ─────────────────────────────────────────────────────────────────────────

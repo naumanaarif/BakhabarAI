@@ -12,7 +12,7 @@ def initialize_firebase():
     """
     if not firebase_admin._apps:
         cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-        project_id = os.getenv("FIREBASE_PROJECT_ID", "fleet-rite-496215-n7")
+        project_id = os.getenv("FIREBASE_PROJECT_ID", "fleet-rite-496215-n7").strip().replace("\ufeff", "")
         
         if cred_path and os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
